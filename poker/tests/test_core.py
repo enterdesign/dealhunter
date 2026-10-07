@@ -39,6 +39,12 @@ class Core(unittest.TestCase):
             self.assertTrue(2 <= pr["players"] <= 6, name)
             self.assertLess(c.slots_gb(pr["slots"]), 40, name)
 
+    def test_every_preset_has_a_description(self):
+        self.assertEqual(set(c.PRESETS), set(c.PRESET_INFO))
+        for name, text in c.PRESET_INFO.items():
+            self.assertIn("RAM", text, name)
+            self.assertIn("Czas", text, name)
+
     def test_eval_line(self):
         e = c.parse_eval("EVAL iter 3000000: current vs snapshot from iter 2000000: -30.9 mbb/hand (+-54.2)")
         self.assertEqual((e["iters"], e["prev"], e["mbb"], e["ci"]), (3000000, 2000000, -30.9, 54.2))

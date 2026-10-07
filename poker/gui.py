@@ -15,7 +15,7 @@ class App(tk.Tk):
     def __init__(self):
         super().__init__()
         self.title("pokerai trainer")
-        self.geometry("860x820")
+        self.geometry("880x900")
         self.proc = None
         self.q = queue.Queue()
         self.vars = {}
@@ -48,6 +48,9 @@ class App(tk.Tk):
         self.preset = ttk.Combobox(pf, values=list(core.PRESETS), state="readonly", width=28)
         self.preset.grid(row=0, column=1, columnspan=2, sticky="w")
         self.preset.bind("<<ComboboxSelected>>", self._apply_preset)
+        self.preset_info = ttk.Label(pf, text="Wybierz preset, zobaczysz tu jego opis (czas, pamiec, co robi).", wraplength=780,
+                                     justify="left", foreground="#333")
+        self.preset_info.grid(row=14, column=0, columnspan=6, sticky="w", padx=8, pady=(6, 2))
         self._field(pf, "players", "Players at the table (2-6)", 2, 1, hint="more players = much bigger game")
         self._field(pf, "stack", "Stack depth (big blinds)", 20, 2)
         self._field(pf, "buckets", "Hand buckets / street", 24, 3, hint="more = finer, bigger game")
@@ -103,8 +106,10 @@ class App(tk.Tk):
             self.mem.config(text="")
 
     def _apply_preset(self, _=None):
-        for k, v in core.PRESETS[self.preset.get()].items():
+        name = self.preset.get()
+        for k, v in core.PRESETS[name].items():
             self.vars[k].set(str(v))
+        self.preset_info.config(text=core.PRESET_INFO.get(name, ""))
 
     def _write(self, text):
         self.log.config(state="normal")

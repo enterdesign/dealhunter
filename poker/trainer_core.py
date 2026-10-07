@@ -11,10 +11,36 @@ def _p(players, stack, buckets, sizes, post, maxr, pmaxr, slots, iters, evalever
 PRESETS = {
     "Heads-up 20 bb - quick test":          _p(2, 20, 24, "0.5,1.0", "0.5,1.0", 3, 3, 22, "20M", "5M"),
     "Heads-up 20 bb - thorough":            _p(2, 20, 50, "0.5,1.0", "0.5,1.0", 3, 3, 25, "1G", "100M", 150),
-    "Heads-up 100 bb (overnight)":          _p(2, 100, 30, "0.33,0.75,1.5", "0.33,0.75,1.5", 3, 3, 28, "3G", "200M"),
-    "3-handed 20 bb":                       _p(3, 20, 16, "0.5,1.0", "0.5,1.0", 3, 3, 27, "500M", "50M"),
-    "6-max 20 bb - lite (fast)":            _p(6, 20, 12, "1.0", "1.0", 2, 2, 25, "300M", "50M"),
-    "6-max 20 bb - standard (overnight)":   _p(6, 20, 12, "0.5,1.0", "1.0", 3, 2, 28, "3G", "200M"),
+    "Heads-up 100 bb (overnight)":          _p(2, 100, 30, "0.33,0.75,1.5", "0.33,0.75,1.5", 3, 3, 28, "2G", "200M"),
+    "3-handed 20 bb":                       _p(3, 20, 16, "0.5,1.0", "0.5,1.0", 3, 3, 25, "200M", "25M"),
+    "6-max 20 bb - lite (fast)":            _p(6, 20, 12, "1.0", "1.0", 2, 2, 25, "100M", "20M"),
+    "6-max 20 bb - standard (overnight)":   _p(6, 20, 12, "0.5,1.0", "1.0", 3, 2, 28, "1G", "100M"),
+}
+
+# Shown in the GUI when a preset is selected. Times are rough estimates for 14 threads, based on speeds measured
+# on 4 threads and assuming near-linear scaling (it may scale worse). You can always stop earlier with "Stop and save".
+PRESET_INFO = {
+    "Heads-up 20 bb - quick test":
+        "Gra 1 na 1, stacki 20 bb. Szybki test: sprawdzasz, ze wszystko dziala, i dostajesz bota o sile gotowego hu_20bb.\n"
+        "Czas: ok. 5 minut | RAM: 0,3 GB | gra ma ok. 100 tys. pozycji, wiec szybko sie nasyca.",
+    "Heads-up 20 bb - thorough":
+        "Gra 1 na 1, 20 bb, dokladniejsze ocenianie kart (50 kubelkow zamiast 24, 150 prob). Do porzadnego wytrenowania heads-up.\n"
+        "Czas: kilka godzin (ok. 6-8 h dla 1G iteracji) | RAM: 2,4 GB | patrz na linie 'progress check': gdy wynik ~0, mozna konczyc.",
+    "Heads-up 100 bb (overnight)":
+        "Gra 1 na 1 na glebokich stackach (100 bb), 3 wielkosci zakladow. Najbardziej zblizone do zwyklej gry, ale duzo wieksza gra.\n"
+        "Czas: ok. 10-20 h dla 2G iteracji (bardzo przyblizone) | RAM: 19 GB | w pierwszym milionie iteracji rosnie do ok. 5 mln pozycji i dalej. "
+        "Nie wiem, ile iteracji wystarczy: patrz na 'progress check'.",
+    "3-handed 20 bb":
+        "Stol na 3 osoby (BTN, SB, BB), 20 bb. Dobry krok pomiedzy 1 na 1 a pelnym stolem.\n"
+        "Czas: ok. 1-2 h dla 200M iteracji | RAM: 1,2 GB tablicy (gra ma ok. 0,5 mln pozycji i szybko sie nasyca) | "
+        "przy 3+ graczach brak gwarancji zbieznosci, oceniaj po wynikach.",
+    "6-max 20 bb - lite (fast)":
+        "Stol na 6 osob, 20 bb, uproszczone akcje (1 wielkosc zakladu, max 2 podbicia na ulice, 12 kubelkow). Najszybszy sposob na bota 6-max.\n"
+        "Czas: ok. 1-2 h dla 100M iteracji (ok. 2 mln pozycji, nasyca sie po kilku milionach iteracji) | RAM: 2,4 GB | slabszy na agresywnych przeciwnikach.",
+    "6-max 20 bb - standard (overnight)":
+        "Stol na 6 osob, 20 bb, 2 wielkosci zakladow przed flopem. Bogatsza gra niz 'lite', ale duzo wieksza.\n"
+        "Czas: ok. 15-20 h dla 1G iteracji (bardzo przyblizone, mozesz zatrzymac wczesniej) | RAM: 19 GB | "
+        "na 300 tys. iteracji bylo juz 5,5 mln pozycji i rosnie dalej; trening sam sie zatrzyma przy 85% zapelnieniu tablicy.",
 }
 
 

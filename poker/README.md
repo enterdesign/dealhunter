@@ -47,6 +47,19 @@ g++ -O3 -march=native -std=c++17 -pthread holdem.cpp -o holdem    # Windows: Min
 - **Progress check**: `--eval-every N` plays the current strategy against a snapshot of itself from the previous check and
   prints `EVAL ...` lines: clearly positive = still improving, around 0 = converged for these settings.
 
+## GUI presets
+| Preset | Players | Stack | What it is | Rough time (14 threads) | RAM |
+|---|---|---|---|---|---|
+| Heads-up 20 bb - quick test | 2 | 20 bb | check that everything works; about as strong as the included `hu_20bb.bin` | ~5 min | 0.3 GB |
+| Heads-up 20 bb - thorough | 2 | 20 bb | finer card buckets (50), for a properly trained heads-up bot | ~6-8 h | 2.4 GB |
+| Heads-up 100 bb (overnight) | 2 | 100 bb | deep stacks, 3 bet sizes, much bigger game | ~10-20 h | 19 GB |
+| 3-handed 20 bb | 3 | 20 bb | BTN/SB/BB, saturates at ~0.5 M info sets | ~1-2 h | 1.2 GB |
+| 6-max 20 bb - lite (fast) | 6 | 20 bb | 1 bet size, 2 raises per street, ~2 M info sets | ~1-2 h | 2.4 GB |
+| 6-max 20 bb - standard (overnight) | 6 | 20 bb | 2 preflop sizes, grows to tens of millions of info sets | ~15-20 h | 19 GB |
+
+Times are very rough (measured on 4 threads, scaled linearly). Stop any time with *Stop and save*; the "progress check" line
+tells you whether more training still helps. The preset description is also shown in the GUI.
+
 ## Honest limits
 See `PLAN.md`. Short version: heads-up is theoretically sound; with 3+ players CFR has no convergence guarantee (it works
 well in practice, e.g. Pluribus, but that took a supercomputer and live search). The 6-player bots here use a small
