@@ -43,7 +43,11 @@ g++ -O3 -march=native -std=c++17 -pthread holdem.cpp -o holdem    # Windows: Min
 ./holdem train --stack 20 --iters 8000000 --threads 8 --out s20.bin
 ./holdem play s20.bin                        # play against the bot (pick actions by number)
 ./holdem eval s20.bin --hands 100000         # bot vs simple baseline bots
+./holdem compare new.bin old.bin --hands 200000   # which of two strategies is stronger (duplicate-style, seats swapped)
 ```
+
+Is more training better? Save a snapshot (GUI button), train on, then `compare` the new file with the snapshot:
+a clearly positive result (beyond the printed +-) means the extra training helped; around 0 means it has converged for this abstraction.
 
 Deeper stacks (long run, e.g. overnight on a Ryzen 7800X3D, 16 threads):
 ```

@@ -5,6 +5,7 @@ SLOT_BYTES = 72
 
 PRESETS = {
     "Quick test (20 bb)":      dict(stack=20,  buckets=24, eqsamples=100, maxraises=3, sizes="0.5,1.0",       slots=22, iters="20M"),
+    "20 bb, thorough (finer cards)": dict(stack=20, buckets=50, eqsamples=150, maxraises=3, sizes="0.5,1.0", slots=25, iters="1G"),
     "Medium (40 bb)":          dict(stack=40,  buckets=30, eqsamples=100, maxraises=3, sizes="0.5,1.0",       slots=25, iters="500M"),
     "Deep (100 bb, overnight)": dict(stack=100, buckets=30, eqsamples=100, maxraises=3, sizes="0.33,0.75,1.5", slots=28, iters="3G"),
 }

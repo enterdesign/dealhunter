@@ -6,6 +6,7 @@
 //   ./holdem train --resume s100.bin.ckpt --iters 2000000000 --out s100.bin           (continue training)
 //   ./holdem play strategy.bin
 //   ./holdem eval strategy.bin --hands 100000
+//   ./holdem compare new.bin old.bin --hands 200000      (which of two strategies is stronger)
 //
 // Abstraction (see README): fixed stack depth, bet sizes {0.5 pot, 1 pot, all-in}, max 3 raises per street,
 // preflop: 169 lossless hand classes, postflop: hand-equity buckets.
@@ -401,12 +402,13 @@ static bool readCheckpointBody(const string& path) {
 
 struct Strat { unordered_map<u64, array<unsigned char, MAXA + 1>> m; };   // [0] = n, then quantised probs
 
-static bool loadStrategy(const string& path, Strat& S) {
+static bool loadStrategy(const string& path, Strat& S, Hdr* hout = nullptr) {
   FILE* f = fopen(path.c_str(), "rb");
   if (!f) return false;
   Hdr h;
   if (fread(&h, sizeof h, 1, f) != 1 || h.magic != MAGIC || h.kind != 1) { fclose(f); return false; }
   applyHdr(h);
+  if (hout) *hout = h;
   S.m.reserve(h.count);
   for (long long i = 0; i < h.count; i++) {
     u64 key;
@@ -548,6 +550,41 @@ static int cmdEval(const string& path, long long hands) {
     double se = sqrt(max(var, 0.0) / hands);
     printf("bot vs %-20s %+9.1f mbb/hand  (+-%.1f)\n", names[opp], mean / BB * 1000, se / BB * 1000 * 1.96);
   }
+  return 0;
+}
+
+// Duplicate-style match between two strategies trained with the same game settings: every deal is played twice
+// with the seats swapped, which removes most of the card luck.
+static int cmdCompare(const string& pa, const string& pb, long long hands) {
+  Strat A, B;
+  Hdr ha, hb;
+  if (!loadStrategy(pa, A, &ha) || !loadStrategy(pb, B, &hb)) { fprintf(stderr, "cannot load strategy files\n"); return 1; }
+  bool same = ha.start == hb.start && ha.nbuck == hb.nbuck && ha.maxr == hb.maxr && ha.eqs == hb.eqs && ha.nfr == hb.nfr;
+  for (int i = 0; same && i < ha.nfr; i++) same = ha.fr[i] == hb.fr[i];
+  if (!same) { fprintf(stderr, "the two strategies were trained with different game settings, they cannot play each other\n"); return 1; }
+  applyHdr(ha);
+  Rng rng(98765);
+  double sum = 0, sq = 0;
+  long long deals = max(1LL, hands / 2);
+  for (long long g = 0; g < deals; g++) {
+    Deal d; dealRandom(d, rng);
+    double x = 0;
+    for (int seatA = 0; seatA < 2; seatA++) {
+      St s = newHand();
+      while (!(s.fold || s.showdown)) {
+        Act acts[MAXA];
+        int n = legal(s, acts);
+        const Strat& S = s.toAct == seatA ? A : B;
+        s = step(s, acts[botChoose(S, s, d, acts, n, rng)]);
+      }
+      x += util(s, seatA, d) / 2;
+    }
+    sum += x; sq += x * x;
+  }
+  double mean = sum / deals, var = sq / deals - mean * mean, se = sqrt(max(var, 0.0) / deals);
+  printf("stack %d bb | %lld deals x 2 seats\n", START / BB, deals);
+  printf("A = %s (%zu infosets)\nB = %s (%zu infosets)\n", pa.c_str(), A.m.size(), pb.c_str(), B.m.size());
+  printf("A vs B: %+.1f mbb/hand (+-%.1f, 95%%)   [positive = A is stronger]\n", mean / BB * 1000, se / BB * 1000 * 1.96);
   return 0;
 }
 
@@ -698,6 +735,7 @@ int main(int argc, char** argv) {
     return cmdTrain(o);
   }
   if (cmd == "play" && argc >= 3) return cmdPlay(argv[2]);
+  if (cmd == "compare" && argc >= 4) return cmdCompare(argv[2], argv[3], atoll(arg("--hands", "200000").c_str()));
   if (cmd == "eval" && argc >= 3) return cmdEval(argv[2], atoll(arg("--hands", "50000").c_str()));
   fprintf(stderr, "bad arguments\n");
   return 1;

@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """Small GUI to train, evaluate and play the hold'em bot.   python gui.py   (needs Python 3 with tkinter)"""
-import os, queue, subprocess, sys, threading
+import datetime, os, queue, shutil, subprocess, sys, threading
 import tkinter as tk
 from tkinter import filedialog, messagebox, ttk
 
@@ -71,6 +71,10 @@ class App(tk.Tk):
             b.pack(side="left", padx=4)
         ttk.Button(bf, text="Evaluate vs baselines", command=self._eval).pack(side="left", padx=(24, 4))
         ttk.Button(bf, text="Play against the bot", command=self._play).pack(side="left", padx=4)
+        bf2 = ttk.Frame(self, padding=(8, 0))
+        bf2.pack(fill="x")
+        ttk.Button(bf2, text="Save snapshot of current strategy", command=self._snapshot).pack(side="left", padx=4)
+        ttk.Button(bf2, text="Compare two strategies...", command=self._compare).pack(side="left", padx=4)
 
         sf = ttk.LabelFrame(self, text="Progress", padding=8)
         sf.pack(fill="x", padx=8, pady=4)
@@ -198,6 +202,27 @@ class App(tk.Tk):
                 except OSError:
                     continue
             messagebox.showinfo("play", f"Run in a terminal:\n{b} play {out}")
+
+    def _snapshot(self):
+        out = self.vars["out"].get()
+        if not os.path.isfile(out):
+            messagebox.showinfo("no strategy yet", "The strategy file does not exist yet (it is saved every 10 minutes and on Stop).")
+            return
+        dst = os.path.splitext(out)[0] + "_snap_" + datetime.datetime.now().strftime("%Y%m%d_%H%M") + ".bin"
+        shutil.copyfile(out, dst)
+        self._write(f"snapshot saved: {dst}\n")
+
+    def _compare(self):
+        b = self._binary()
+        if not b:
+            return
+        d = os.path.dirname(self.vars["out"].get()) or "."
+        a = filedialog.askopenfilename(title="Strategy A (e.g. the newer one)", initialdir=d, filetypes=[("strategy", "*.bin")])
+        if not a:
+            return
+        c = filedialog.askopenfilename(title="Strategy B (e.g. the older snapshot)", initialdir=d, filetypes=[("strategy", "*.bin")])
+        if c:
+            self._run([b, "compare", a, c, "--hands", "200000"])
 
     def _build_bin(self):
         cmd, out = core.build_command(BASE)
