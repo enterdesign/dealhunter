@@ -1,0 +1,32 @@
+[
+  {
+    "name": "Demo Shop A",
+    "url_contains": "/demo-shop/a/",
+    "add_to_cart": "#add-to-cart",
+    "cart_url": null,
+    "postcode_input": "#postcode",
+    "postcode_apply": "#postcode-apply",
+    "code_input": "#promo-code",
+    "code_apply": "#promo-apply",
+    "subtotal": "#subtotal",
+    "shipping": "#shipping",
+    "total": "#total",
+    "code_error": ".promo-error",
+    "code_success": ".promo-ok"
+  },
+  {
+    "name": "Demo Shop B",
+    "url_contains": "/demo-shop/b/",
+    "add_to_cart": "#add-to-cart",
+    "cart_url": null,
+    "postcode_input": "#postcode",
+    "postcode_apply": "#postcode-apply",
+    "code_input": "#promo-code",
+    "code_apply": "#promo-apply",
+    "subtotal": "#subtotal",
+    "shipping": "#shipping",
+    "total": "#total",
+    "code_error": ".promo-error",
+    "code_success": ".promo-ok"
+  }
+]
