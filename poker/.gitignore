@@ -2,3 +2,7 @@ __pycache__/
 *.pyc
 *.ckpt
 *.tmp
+*.stop
+# trained strategies can be huge: only the small 20 bb one is tracked
+strategies/*.bin
+!strategies/hu_20bb.bin
