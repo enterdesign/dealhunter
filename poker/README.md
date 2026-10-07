@@ -23,6 +23,15 @@ No dependencies (pure Python 3).
 *Exploitability* = how much a perfect opponent could win per hand against the strategy (0 = unbeatable).
 Since the bot plays an equilibrium, it can't be beaten in the long run, but in a few dozen hands a human can still win by luck.
 
+## GUI
+
+```
+python gui.py          # Python 3 with tkinter (included in the python.org installer for Windows)
+```
+Set parameters (or pick a preset), press **Start new training**, watch progress/ETA, **Stop and save** any time,
+**Resume** later, **Evaluate** against baseline bots, **Play** against the bot. It drives the `holdem` program below
+(press *Build (g++)* once, or download the Windows build from the GitHub Actions run).
+
 ## No-limit Texas hold'em (`holdem/`)
 
 Heads-up, fixed stack depth (default **20 big blinds**), single C++ file, no dependencies.
@@ -38,11 +47,11 @@ g++ -O3 -march=native -std=c++17 -pthread holdem.cpp -o holdem    # Windows: Min
 
 Deeper stacks (long run, e.g. overnight on a Ryzen 7800X3D, 16 threads):
 ```
-./holdem train --stack 100 --iters 3000000000 --threads 14 --slots 26 \
+./holdem train --stack 100 --iters 3000000000 --threads 14 --slots 28 \
                --buckets 30 --sizes 0.33,0.75,1.5 --out s100.bin
 ```
-- `--slots N` = hash table of 2^N info sets, 72 bytes each (26 -> 4.8 GB, 27 -> 9.7 GB). Training stops when it is 85% full. 100 bb with 3 sizes grows to several million info sets within the first million iterations.
-- Ctrl+C saves and stops. Progress is also saved every 10 minutes to `s100.bin` (play file) and `s100.bin.ckpt` (full training state).
+- `--slots N` = hash table of 2^N info sets, 72 bytes each (26 -> 4.8 GB, 27 -> 9.7 GB, 28 -> 19 GB; with 64 GB RAM use 28). Training stops when it is 85% full. 100 bb with 3 sizes grows to several million info sets within the first million iterations.
+- Ctrl+C (or the GUI's Stop button, or creating `<out>.stop`) saves and stops. Progress is also saved every 10 minutes to `s100.bin` (play file) and `s100.bin.ckpt` (full training state).
 - Continue later: `./holdem train --resume s100.bin.ckpt --iters 6000000000 --threads 14 --slots 26 --out s100.bin`
 - Other options: `--maxraises 3`, `--eqsamples 100`, up to 4 `--sizes` (fractions of the pot).
 - GPU is not used: this algorithm is branchy and memory bound, the CPU is the right tool.
@@ -62,5 +71,6 @@ quality is measured by results against baseline bots and, best of all, against r
 ## Layout
 - `pokerai/kuhn.py`, `pokerai/leduc.py`: games (one common interface)
 - `pokerai/cfr.py`: CFR+ solver; `pokerai/exploit.py`: exact exploitability / game value
+- `gui.py` + `trainer_core.py`: tkinter front end (logic unit-tested in `tests/test_core.py`)
 - `train.py`, `play.py`, `tests/`: Kuhn/Leduc tools (Python)
 - `holdem/holdem.cpp`: heads-up no-limit hold'em (C++)

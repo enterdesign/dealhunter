@@ -1,0 +1,27 @@
+name: build-holdem
+on:
+  push:
+    paths: ["poker/holdem/**", ".github/workflows/build-holdem.yml"]
+  workflow_dispatch:
+jobs:
+  build:
+    strategy:
+      matrix:
+        os: [windows-latest, ubuntu-latest]
+    runs-on: ${{ matrix.os }}
+    defaults:
+      run:
+        shell: bash
+    steps:
+      - uses: actions/checkout@v4
+      - name: Build
+        working-directory: poker/holdem
+        run: |
+          g++ -O3 -std=c++17 -pthread holdem.cpp -o holdem
+          ./holdem test
+      - uses: actions/upload-artifact@v4
+        with:
+          name: holdem-${{ matrix.os }}
+          path: |
+            poker/holdem/holdem
+            poker/holdem/holdem.exe

@@ -459,6 +459,8 @@ static int cmdTrain(const TrainOpts& o) {
     allocTable(o.logSlots);
   }
   signal(SIGINT, onSigint);
+  const string stopFile = o.out + ".stop";   // creating this file asks training to finish the round, save and exit
+  remove(stopFile.c_str());
   printf("stack %d bb, %d buckets, sizes", START / BB, NBUCK);
   for (double f : FRACS) printf(" %.2f", f);
   printf(", max %d raises, %d threads, table %.1f GB\n", MAXR, o.threads, tableSize * sizeof(Slot) / 1e9);
@@ -467,7 +469,7 @@ static int cmdTrain(const TrainOpts& o) {
   long long start = done;
   while (done < o.iters && !g_stop) {
     round++;
-    long long per = max(1LL, o.roundIters / o.threads);
+    long long per = max(1LL, min(o.roundIters, o.iters - done) / o.threads);
     vector<thread> th;
     for (int t = 0; t < o.threads; t++)
       th.emplace_back([&, t]() {
@@ -488,6 +490,7 @@ static int cmdTrain(const TrainOpts& o) {
     printf("round %lld  iter %lld  infosets %zu (%.0f%% of table)  %.0f it/s  %.0fs\n", round, done, used.load(),
            100.0 * used.load() / tableSize, (done - start) / sec, sec);
     fflush(stdout);
+    if (FILE* sf = fopen(stopFile.c_str(), "rb")) { fclose(sf); remove(stopFile.c_str()); g_stop = true; }
     if (used.load() > tableSize * 0.85) { printf("table is 85%% full, stopping (use a larger --slots next time)\n"); break; }
     if (chrono::duration<double>(chrono::steady_clock::now() - lastSave).count() > 600) {
       saveFiles(o.out, done, round);
