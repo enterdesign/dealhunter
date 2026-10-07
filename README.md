@@ -1,29 +1,27 @@
-# DealHunter (tier 1 – bez AI w backendzie)
+# flightware -> sim dashboard
 
-Strona + backend (FastAPI + Playwright). Użytkownik podaje EAN/link, miejsce dostawy i listę
-kandydatów (sklep, link, kody). Backend sam wrzuca produkt do koszyka, wpisuje adres, testuje
-kody, odczytuje cenę i układa ranking (z dostawą / bez).
+Touch dashboard for sim racing (AC, ACC, iRacing) on a **Waveshare ESP32-S3-Touch-LCD-7B** (7", 1024x600, capacitive touch),
+fed by SimHub over USB. Swipe between pages:
 
-Listę kandydatów możesz wygenerować w darmowym czacie AI (przycisk „Kopiuj prompt dla czatu AI”)
-– backend nie wywołuje żadnego API AI, więc nie ma kosztów tokenów.
+1. **Dashboard**: speed, gear, RPM bar, fuel, lap, position
+2. **Standings**: top 8
+3. **Buttons**: touch buttons that send USB HID keys (pit, TC/ABS, brake bias, ...)
 
-## Uruchomienie
 ```
-python -m venv .venv && . .venv/bin/activate
-pip install -r requirements.txt && playwright install chromium
-uvicorn app.main:app --reload     # http://127.0.0.1:8000
+SimHub (PC) --USB serial lines--> ESP32-S3 --LVGL--> screen
+                             <--USB HID keys-- touch buttons
 ```
-`CHROMIUM_PATH=/ścieżka/do/chrome` pozwala użyć już zainstalowanej przeglądarki.
-Przycisk „Wstaw przykład” używa wbudowanego sklepu demo (`/demo-shop`).
 
-## Dodawanie sklepu
-Wpis w `app/shops.json` (selektory: add_to_cart, postcode, kod rabatowy, sumy). Sklep bez wpisu
-dostaje tylko cenę z JSON-LD i status „niezweryfikowane”. Sklepy z mocną ochroną antybotową mogą
-wymagać osobnego adaptera/proxy. Sprawdź regulamin sklepu przed automatyzacją.
+## Status
+- `firmware/src/protocol.h`: line protocol parser, **tested on PC** (`firmware/test/protocol_test.cpp`).
+- `tools/simulator.py`: fake SimHub for developing without a sim running.
+- `firmware/src/ui.cpp`, `main.cpp`: LVGL pages, serial reader and HID keys. **Not compiled or run yet.**
+- `firmware/src/board.cpp`: **stub**. Panel/touch/backlight init must be copied from Waveshare's demo once the board is in hand.
+- `docs/simhub-setup.md`: SimHub configuration (property names to be verified).
 
-## Testy
-`CHROMIUM_PATH=... pytest -q`
+## Open questions (need the hardware)
+- Is the board's USB-C the native ESP32-S3 USB? If not, serial and HID can't share one cable.
+- Required `lv_conf.h` settings (fonts 28/48, memory in PSRAM).
 
-## Ograniczenia
-Zadania są trzymane w pamięci (restart = utrata), max 15 kandydatów na zadanie, 3 równoległe koszyki.
-Linki do adresów prywatnych są blokowane (ochrona SSRF).
+## Hardware
+Waveshare ESP32-S3-Touch-LCD-7B (Amazon.ie, 53.99 EUR), USB-C data cable, powered USB hub.
