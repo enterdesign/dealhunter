@@ -1,82 +1,53 @@
 # pokerai
 
-Poker bot learned by **self-play** (CFR+), to play 1v1 against a human in the terminal.
-No hand histories needed: the bot computes an (approximate) Nash equilibrium strategy.
+Poker bot learned by **self-play** (CFR, a game-theory algorithm), for 2 to 6 players at the table.
+No hand histories are needed: the bot computes a strategy by playing against itself.
 
-## Run
-
-```
-python3 train.py leduc --iters 10000     # ~70 s, saves strategies/leduc.json
-python3 play.py leduc                    # play against it (f = fold, c = check/call, r = bet/raise)
-python3 -m unittest discover -s tests -t .
-```
-
-No dependencies (pure Python 3).
-
-## Status
-| Game | Status |
+## What is in here
+| Part | What it does |
 |---|---|
-| Kuhn poker (3 cards) | solved, exploitability ~0.002, value -0.0558 (theory: -1/18) |
-| Leduc hold'em (6 cards, 2 rounds) | exploitability ~0.01 after 10k iterations, value -0.0857 (known value ~ -0.0856) |
-| Heads-up **no-limit Texas hold'em** | `holdem/holdem.cpp`, C++ (see below) |
+| `holdem/holdem.cpp` | **No-limit Texas hold'em, 2-6 players**: training, play, evaluation (C++, no dependencies) |
+| `gui.py` | window to set parameters, train, stop, resume, evaluate, compare, play |
+| `pokerai/`, `train.py`, `play.py` | small teaching games (Kuhn, Leduc) with exact exploitability |
+| `strategies/hu_20bb.bin` | ready heads-up bot, 20 big blinds |
+| `PLAN.md` | design and honest limits, read this first |
 
-*Exploitability* = how much a perfect opponent could win per hand against the strategy (0 = unbeatable).
-Since the bot plays an equilibrium, it can't be beaten in the long run, but in a few dozen hands a human can still win by luck.
+## Quick start (Windows ZIP)
+- `PLAY_20bb.bat`: play the ready heads-up bot (no Python needed).
+- `START_GUI.bat`: the GUI (needs Python 3 with tkinter). Pick a preset, press *Start new training*.
+- Command line: see below. `QUICKSTART_PL.txt` has the same in Polish.
 
-## GUI
-
-```
-python gui.py          # Python 3 with tkinter (included in the python.org installer for Windows)
-```
-Set parameters (or pick a preset), press **Start new training**, watch progress/ETA, **Stop and save** any time,
-**Resume** later, **Evaluate** against baseline bots, **Play** against the bot. It drives the `holdem` program below
-(press *Build (g++)* once, or download the Windows build from the GitHub Actions run).
-
-## No-limit Texas hold'em (`holdem/`)
-
-Heads-up, fixed stack depth (default **20 big blinds**), single C++ file, no dependencies.
-
+## holdem command line
 ```
 cd holdem
 g++ -O3 -march=native -std=c++17 -pthread holdem.cpp -o holdem    # Windows: MinGW-w64 (or WSL)
-./holdem test                                # evaluator, abstraction and game-rule checks
-./holdem train --stack 20 --iters 8000000 --threads 8 --out s20.bin
-./holdem play s20.bin                        # play against the bot (pick actions by number)
-./holdem eval s20.bin --hands 100000         # bot vs simple baseline bots
-./holdem compare new.bin old.bin --hands 200000   # which of two strategies is stronger (duplicate-style, seats swapped)
+./holdem test                                  # evaluator, side pots, game rules for 2..6 players
+./holdem train --players 6 --stack 20 --buckets 12 --sizes 1.0 --post-sizes 1.0 --maxraises 2 --post-maxraises 2 \
+               --iters 300000000 --threads 14 --slots 25 --eval-every 50000000 --out s6.bin
+./holdem play s6.bin                           # you against N-1 bots (your seat rotates every hand)
+./holdem eval s6.bin --hands 100000            # bot vs simple baseline bots
+./holdem compare new.bin old.bin --hands 100000   # one copy of A against N-1 copies of B
 ```
-
-During training `--eval-every N` (GUI: "Check vs previous every") plays the current bot against a snapshot of itself from the previous check and prints `EVAL ...` lines. Positive beyond the printed +- = still improving; around 0 = converged for these settings.
-
-Is more training better? Save a snapshot (GUI button), train on, then `compare` the new file with the snapshot:
-a clearly positive result (beyond the printed +-) means the extra training helped; around 0 means it has converged for this abstraction.
-
-Deeper stacks (long run, e.g. overnight on a Ryzen 7800X3D, 16 threads):
-```
-./holdem train --stack 100 --iters 3000000000 --threads 14 --slots 28 \
-               --buckets 30 --sizes 0.33,0.75,1.5 --out s100.bin
-```
-- `--slots N` = hash table of 2^N info sets, 72 bytes each (26 -> 4.8 GB, 27 -> 9.7 GB, 28 -> 19 GB; with 64 GB RAM use 28). Training stops when it is 85% full. 100 bb with 3 sizes grows to several million info sets within the first million iterations.
-- Ctrl+C (or the GUI's Stop button, or creating `<out>.stop`) saves and stops. Progress is also saved every 10 minutes to `s100.bin` (play file) and `s100.bin.ckpt` (full training state).
-- Continue later: `./holdem train --resume s100.bin.ckpt --iters 6000000000 --threads 14 --slots 26 --out s100.bin`
-- Other options: `--maxraises 3`, `--eqsamples 100`, up to 4 `--sizes` (fractions of the pot).
+- Ctrl+C (or the GUI's Stop button, or creating `<out>.stop`) saves and stops. Progress is also saved every 10 minutes
+  to `<out>` (play file) and `<out>.ckpt` (full training state). Continue with `--resume <out>.ckpt --iters <bigger total>`.
+- `--slots N` = hash table of 2^N info sets, 72 bytes each (25 -> 2.4 GB, 27 -> 9.7 GB, 28 -> 19 GB). Training stops at 85% full.
 - GPU is not used: this algorithm is branchy and memory bound, the CPU is the right tool.
-- Don't commit big `.bin`/`.ckpt` files.
+- Don't commit big `.bin` / `.ckpt` files.
 
-How it works:
-- **Training**: external-sampling Monte Carlo CFR (self-play), multithreaded lock-free ("hogwild"), linear averaging of strategies; ~6000 iterations/s per core at 20 bb.
-- **Card abstraction**: preflop = 169 lossless hand classes; flop/turn/river = equity buckets (default 24) by hand equity vs a random hand.
-- **Action abstraction**: fold, call/check, raises of configurable pot fractions (default 0.5x and 1x pot) or all-in; at most 3 raises per street. You can only choose from the bot's bet sizes (no free-form amounts yet).
-- Button/blind positions alternate each hand; stacks reset every hand (cash-game style).
+## How it works
+- **Training**: external-sampling Monte Carlo CFR. Every iteration deals random cards and walks the game for every player:
+  at the player's own decisions all actions are tried and the *regret* (how much better the alternative would have been) is
+  recorded; at the other players' decisions one action is sampled from their current strategy. Actions with regret get more
+  probability next time. The strategy you play is the **average over all iterations** (that is what converges).
+  Multithreaded lock-free ("hogwild"), linear averaging.
+- **Card abstraction**: preflop = 169 lossless hand classes; flop/turn/river = equity buckets against the number of live opponents.
+- **Action abstraction**: fold, call/check, raises of configurable pot fractions (separately preflop and postflop) or all-in,
+  limited number of raises per street. Side pots are handled.
+- **Seats**: 0 = button, 1 = small blind, 2 = big blind, then UTG, HJ, CO. Heads-up: button = small blind.
+- **Progress check**: `--eval-every N` plays the current strategy against a snapshot of itself from the previous check and
+  prints `EVAL ...` lines: clearly positive = still improving, around 0 = converged for these settings.
 
-Limits (be realistic): this is a *solved-ish simplified* game, not a full no-limit solver. The bot is strong against weak and
-average players at 20 bb, but a good opponent can find leaks because of the abstraction (similar hands are merged,
-bet sizes are limited, deeper stacks and 4-bet+ lines are cut). There is no exploitability number for a game this size;
-quality is measured by results against baseline bots and, best of all, against real opponents (many hundreds of hands, because poker variance is huge).
-
-## Layout
-- `pokerai/kuhn.py`, `pokerai/leduc.py`: games (one common interface)
-- `pokerai/cfr.py`: CFR+ solver; `pokerai/exploit.py`: exact exploitability / game value
-- `gui.py` + `trainer_core.py`: tkinter front end (logic unit-tested in `tests/test_core.py`)
-- `train.py`, `play.py`, `tests/`: Kuhn/Leduc tools (Python)
-- `holdem/holdem.cpp`: heads-up no-limit hold'em (C++)
+## Honest limits
+See `PLAN.md`. Short version: heads-up is theoretically sound; with 3+ players CFR has no convergence guarantee (it works
+well in practice, e.g. Pluribus, but that took a supercomputer and live search). The 6-player bots here use a small
+game (20 bb stacks, few bet sizes) so they can be trained on one PC. Don't expect a professional-level 6-max 100 bb bot.

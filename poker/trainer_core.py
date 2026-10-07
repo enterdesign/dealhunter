@@ -3,11 +3,18 @@ import os, re, sys
 
 SLOT_BYTES = 72
 
+def _p(players, stack, buckets, sizes, post, maxr, pmaxr, slots, iters, evalevery, eqs=100):
+    return dict(players=players, stack=stack, buckets=buckets, eqsamples=eqs, maxraises=maxr, postmaxraises=pmaxr,
+                sizes=sizes, postsizes=post, slots=slots, iters=iters, evalevery=evalevery)
+
+
 PRESETS = {
-    "Quick test (20 bb)":      dict(stack=20,  buckets=24, eqsamples=100, maxraises=3, sizes="0.5,1.0",       slots=22, iters="20M", evalevery="5M"),
-    "20 bb, thorough (finer cards)": dict(stack=20, buckets=50, eqsamples=150, maxraises=3, sizes="0.5,1.0", slots=25, iters="1G", evalevery="100M"),
-    "Medium (40 bb)":          dict(stack=40,  buckets=30, eqsamples=100, maxraises=3, sizes="0.5,1.0",       slots=25, iters="500M", evalevery="50M"),
-    "Deep (100 bb, overnight)": dict(stack=100, buckets=30, eqsamples=100, maxraises=3, sizes="0.33,0.75,1.5", slots=28, iters="3G", evalevery="200M"),
+    "Heads-up 20 bb - quick test":          _p(2, 20, 24, "0.5,1.0", "0.5,1.0", 3, 3, 22, "20M", "5M"),
+    "Heads-up 20 bb - thorough":            _p(2, 20, 50, "0.5,1.0", "0.5,1.0", 3, 3, 25, "1G", "100M", 150),
+    "Heads-up 100 bb (overnight)":          _p(2, 100, 30, "0.33,0.75,1.5", "0.33,0.75,1.5", 3, 3, 28, "3G", "200M"),
+    "3-handed 20 bb":                       _p(3, 20, 16, "0.5,1.0", "0.5,1.0", 3, 3, 27, "500M", "50M"),
+    "6-max 20 bb - lite (fast)":            _p(6, 20, 12, "1.0", "1.0", 2, 2, 25, "300M", "50M"),
+    "6-max 20 bb - standard (overnight)":   _p(6, 20, 12, "0.5,1.0", "1.0", 3, 2, 28, "3G", "200M"),
 }
 
 
@@ -39,9 +46,12 @@ def train_command(binary, p, resume=False):
     if resume:
         return [binary, "train", "--resume", p["out"] + ".ckpt"] + base[2:]
     parse_sizes(p["sizes"])
-    return base + ["--stack", str(int(p["stack"])), "--buckets", str(int(p["buckets"])),
+    post = p.get("postsizes") or p["sizes"]
+    parse_sizes(post)
+    return base + ["--players", str(int(p.get("players", 2))), "--stack", str(int(p["stack"])), "--buckets", str(int(p["buckets"])),
                    "--eqsamples", str(int(p["eqsamples"])), "--maxraises", str(int(p["maxraises"])),
-                   "--sizes", p["sizes"].replace(" ", "")]
+                   "--post-maxraises", str(int(p.get("postmaxraises") or p["maxraises"])),
+                   "--sizes", p["sizes"].replace(" ", ""), "--post-sizes", post.replace(" ", "")]
 
 
 PROGRESS = re.compile(r"round (\d+)\s+iter (\d+)\s+infosets (\d+) \(([\d.]+)% of table\)\s+(\d+) it/s\s+(\d+)s")

@@ -20,14 +20,24 @@ class Core(unittest.TestCase):
                 c.parse_sizes(bad)
 
     def test_commands(self):
-        p = dict(stack=100, buckets=30, eqsamples=100, maxraises=3, sizes="0.33, 0.75", slots=28, iters="3G", threads=14, out="s.bin")
+        p = dict(players=6, stack=100, buckets=30, eqsamples=100, maxraises=3, sizes="0.33, 0.75", slots=28, iters="3G", threads=14, out="s.bin")
         cmd = c.train_command("./holdem", p)
         self.assertIn("--stack", cmd)
         self.assertEqual(cmd[cmd.index("--sizes") + 1], "0.33,0.75")
+        self.assertEqual(cmd[cmd.index("--post-sizes") + 1], "0.33,0.75")
+        self.assertEqual(cmd[cmd.index("--players") + 1], "6")
         self.assertEqual(cmd[cmd.index("--iters") + 1], "3000000000")
         r = c.train_command("./holdem", p, resume=True)
         self.assertEqual(r[2:4], ["--resume", "s.bin.ckpt"])
         self.assertNotIn("--stack", r)
+
+    def test_presets_are_valid(self):
+        for name, pr in c.PRESETS.items():
+            p = dict(pr, threads=2, out="x.bin")
+            cmd = c.train_command("./h", p)
+            self.assertIn("--players", cmd, name)
+            self.assertTrue(2 <= pr["players"] <= 6, name)
+            self.assertLess(c.slots_gb(pr["slots"]), 40, name)
 
     def test_eval_line(self):
         e = c.parse_eval("EVAL iter 3000000: current vs snapshot from iter 2000000: -30.9 mbb/hand (+-54.2)")

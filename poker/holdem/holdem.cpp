@@ -1,16 +1,18 @@
-// Heads-up no-limit Texas hold'em bot: external-sampling MCCFR with card + action abstraction.
+// No-limit Texas hold'em bot for 2 to 6 players: external-sampling MCCFR with card + action abstraction.
 //
-//   g++ -O2 -std=c++17 holdem.cpp -o holdem
+//   g++ -O3 -std=c++17 -pthread holdem.cpp -o holdem
 //   ./holdem test
-//   ./holdem train --stack 100 --iters 2000000000 --threads 16 --slots 27 --out s100.bin   (Ctrl+C = save and stop)
-//   ./holdem train --resume s100.bin.ckpt --iters 2000000000 --out s100.bin           (continue training)
+//   ./holdem train --players 6 --stack 20 --iters 2000000000 --threads 14 --slots 28 --out s6.bin   (Ctrl+C = save and stop)
+//   ./holdem train --resume s6.bin.ckpt --iters 4000000000 --out s6.bin --slots 28                   (continue training)
 //   (add --eval-every 50000000 to print "current vs previous snapshot" progress checks during training)
-//   ./holdem play strategy.bin
-//   ./holdem eval strategy.bin --hands 100000
-//   ./holdem compare new.bin old.bin --hands 200000      (which of two strategies is stronger)
+//   ./holdem play s6.bin
+//   ./holdem eval s6.bin --hands 100000             (bot vs simple baseline bots)
+//   ./holdem compare new.bin old.bin --hands 100000  (which of two strategies is stronger)
 //
-// Abstraction (see README): fixed stack depth, bet sizes {0.5 pot, 1 pot, all-in}, max 3 raises per street,
-// preflop: 169 lossless hand classes, postflop: hand-equity buckets.
+// Seats: 0 = button, 1 = small blind, 2 = big blind (heads-up: seat 0 is button and small blind, seat 1 big blind),
+// then UTG, HJ, CO. The button is fixed in the game tree; in play() the human's seat rotates every hand.
+// Abstraction (see README): fixed equal stacks, bet sizes as pot fractions, max N raises per street,
+// preflop: 169 lossless hand classes, postflop: hand-equity buckets (equity against the number of live opponents).
 #include <bits/stdc++.h>
 #include <csignal>
 #include <thread>
@@ -18,10 +20,13 @@
 using namespace std;
 typedef uint64_t u64;
 
-static int START = 40, BB = 2, SB = 1;   // chips; stack = START (default 20 big blinds)
-static int NBUCK = 24, EQSAMPLES = 100, MAXR = 3;
-static vector<double> FRACS = {0.5, 1.0};   // raise sizes as fractions of the pot (after calling)
-static const int MAXA = 7;                  // fold, call, up to 4 sizes, all-in
+static const int MAXN = 6;
+static int NP = 2;                                   // number of players at the table
+static int START = 40, BB = 2, SB = 1;               // chips; stack = START (default 20 big blinds)
+static int NBUCK = 24, EQSAMPLES = 100, MAXR = 3, PMAXR = 3;   // max raises per street: preflop / postflop
+static vector<double> FRACS = {0.5, 1.0};            // raise sizes as fractions of the pot (after calling), preflop
+static vector<double> PFRACS = {0.5, 1.0};           // same, postflop
+static const int MAXA = 7;                           // fold, call, up to 4 sizes, all-in
 static const int MAXSIZES = 4;
 
 // ---------------------------------------------------------------- utils
@@ -102,9 +107,10 @@ static int canon169(int c1, int c2) {
   return ((c1 & 3) == (c2 & 3) ? 13 : 91) + tri;
 }
 
-// Hand-strength bucket: equity vs a random hand with random runout, Monte Carlo with a seed derived from the
-// cards, so the same situation always maps to the same bucket (needed for training and play to agree).
-static int eqBucket(const int* hole, const int* board, int nb) {
+// Hand-strength bucket: equity against `k` random hands (live opponents) with a random runout, Monte Carlo with a
+// seed derived from the cards, so the same situation always maps to the same bucket (training and play must agree).
+// The equity is mapped with eq^(1/k) so that buckets are spread out also in multiway pots (k = 1: plain equity).
+static int eqBucket(const int* hole, const int* board, int nb, int k) {
   int h[2] = {min(hole[0], hole[1]), max(hole[0], hole[1])};
   int b[5];
   for (int i = 0; i < nb; i++) b[i] = board[i];
@@ -112,62 +118,108 @@ static int eqBucket(const int* hole, const int* board, int nb) {
   u64 seed = 1469598103934665603ULL;
   for (int x : {h[0], h[1]}) seed = mix(seed ^ (x + 1));
   for (int i = 0; i < nb; i++) seed = mix(seed ^ (b[i] + 101));
+  seed = mix(seed ^ (k + 7777));
   Rng rng(seed);
   int deck[52], nd = 0;
   bool used[52] = {false};
   used[h[0]] = used[h[1]] = true;
   for (int i = 0; i < nb; i++) used[b[i]] = true;
   for (int c = 0; c < 52; c++) if (!used[c]) deck[nd++] = c;
-  int need = 2 + (5 - nb);
+  int need = 2 * k + (5 - nb);
   double wins = 0;
   int me[7] = {h[0], h[1], 0, 0, 0, 0, 0}, op[7];
   for (int i = 0; i < nb; i++) me[2 + i] = b[i];
-  for (int k = 0; k < EQSAMPLES; k++) {
+  for (int s = 0; s < EQSAMPLES; s++) {
     for (int i = 0; i < need; i++) swap(deck[i], deck[i + rng.below(nd - i)]);
-    op[0] = deck[0]; op[1] = deck[1];
-    for (int i = 0; i < nb; i++) op[2 + i] = b[i];
-    for (int i = 0; i < 5 - nb; i++) { me[2 + nb + i] = deck[2 + i]; op[2 + nb + i] = deck[2 + i]; }
-    int a = eval(me, 7), o = eval(op, 7);
-    wins += a > o ? 1.0 : (a == o ? 0.5 : 0.0);
+    for (int i = 0; i < 5 - nb; i++) me[2 + nb + i] = deck[2 * k + i];
+    int a = eval(me, 7);
+    int better = 0, ties = 0;
+    for (int o = 0; o < k && better == 0; o++) {
+      op[0] = deck[2 * o]; op[1] = deck[2 * o + 1];
+      for (int i = 0; i < nb; i++) op[2 + i] = b[i];
+      for (int i = 0; i < 5 - nb; i++) op[2 + nb + i] = deck[2 * k + i];
+      int sc = eval(op, 7);
+      if (sc > a) better++;
+      else if (sc == a) ties++;
+    }
+    if (better == 0) wins += 1.0 / (ties + 1);
   }
-  int bk = (int)(wins / EQSAMPLES * NBUCK);
-  return min(bk, NBUCK - 1);
+  double eq = wins / EQSAMPLES;
+  if (k > 1) eq = pow(eq, 1.0 / k);
+  return min((int)(eq * NBUCK), NBUCK - 1);
 }
 
 // ---------------------------------------------------------------- game
 struct Act { int type; int to; };   // 0 fold, 1 call/check, 2 raise to `to` (total bet this street)
 
+static int ORD[2][MAXN];            // acting order: [0] preflop, [1] postflop
+static void initOrders() {
+  if (NP == 2) { ORD[0][0] = 0; ORD[0][1] = 1; ORD[1][0] = 1; ORD[1][1] = 0; return; }
+  for (int i = 0; i < NP; i++) ORD[0][i] = (3 + i) % NP;   // UTG ... BB (3 players: BTN, SB, BB)
+  for (int i = 0; i < NP; i++) ORD[1][i] = (1 + i) % NP;   // SB first, button last
+}
+static inline int sbSeat() { return NP == 2 ? 0 : 1; }
+static inline int bbSeat() { return NP == 2 ? 1 : 2; }
+
+static string seatName(int seat) {
+  static const char* two[] = {"BTN/SB", "BB"};
+  static const char* names[] = {"BTN", "SB", "BB", "UTG", "HJ", "CO"};
+  if (NP == 2) return two[seat];
+  if (NP == 3 || NP == 4) return seat == 3 ? "UTG" : names[seat];
+  if (NP == 5) return seat == 4 ? "CO" : names[seat];
+  return names[seat];
+}
+
 struct St {
   int street = 0, toAct = 0;
-  int stack[2], bet[2];
-  int pot0 = 0;                // chips committed on previous streets (both players)
-  int nacts = 0, raises = 0, lastRaise = 0;
-  bool fold = false, showdown = false;
-  int folder = -1;
+  int stack[MAXN], bet[MAXN];
+  int pot0 = 0;                // chips committed on previous streets (all players)
+  int raises = 0, lastRaise = 0;
+  int folded = 0, pending = 0; // bit masks of seats
+  int winner = -1;             // set when everybody else folded
+  bool over = false;           // hand finished (fold win or showdown)
+  bool showdown = false;
   u64 hist = 12345;
 };
 
 static St newHand() {
   St s;
-  s.stack[0] = START - SB; s.stack[1] = START - BB;
-  s.bet[0] = SB; s.bet[1] = BB;
+  for (int i = 0; i < NP; i++) { s.stack[i] = START; s.bet[i] = 0; }
+  s.stack[sbSeat()] -= SB; s.bet[sbSeat()] = SB;
+  s.stack[bbSeat()] -= BB; s.bet[bbSeat()] = BB;
   s.lastRaise = BB;
-  return s;   // player 0 = button / small blind: acts first preflop, last postflop
+  s.pending = (1 << NP) - 1;
+  s.toAct = ORD[0][0];
+  return s;
+}
+
+static inline int maxBetOf(const St& s) {
+  int m = 0;
+  for (int i = 0; i < NP; i++) m = max(m, s.bet[i]);
+  return m;
 }
 
 static int legal(const St& s, Act* out) {
-  int p = s.toAct, o = 1 - p, n = 0;
-  int facing = s.bet[o] - s.bet[p];
+  int p = s.toAct, n = 0;
+  int maxBet = maxBetOf(s), facing = maxBet - s.bet[p];
   if (facing > 0) out[n++] = {0, 0};
   out[n++] = {1, 0};
-  if (s.stack[o] == 0 || s.stack[p] <= facing || s.raises >= MAXR) return n;
-  int maxTo = min(s.bet[p] + s.stack[p], s.bet[o] + s.stack[o]);   // can't bet more than the opponent can call
-  int minTo = s.bet[o] + max(s.lastRaise, BB);
+  const bool pre = s.street == 0;
+  if (s.raises >= (pre ? MAXR : PMAXR) || s.stack[p] <= facing) return n;
+  const vector<double>& fracs = pre ? FRACS : PFRACS;
+  int capOpp = 0, total = s.pot0;
+  for (int i = 0; i < NP; i++) {
+    total += s.bet[i];
+    if (i != p && !((s.folded >> i) & 1) && s.stack[i] > 0) capOpp = max(capOpp, s.bet[i] + s.stack[i]);
+  }
+  int maxTo = min(s.bet[p] + s.stack[p], capOpp);   // can't bet more than the richest opponent can call
+  if (maxTo <= maxBet) return n;
+  int minTo = maxBet + max(s.lastRaise, BB);
   if (minTo >= maxTo) { out[n++] = {2, maxTo}; return n; }
-  int potAfterCall = s.pot0 + s.bet[0] + s.bet[1] + facing;
+  int potAfterCall = total + facing;
   int tos[MAXSIZES + 1], m = 0;
-  for (size_t i = 0; i < FRACS.size(); i++) {
-    int to = s.bet[o] + (int)llround(FRACS[i] * potAfterCall);
+  for (size_t i = 0; i < fracs.size(); i++) {
+    int to = maxBet + (int)llround(fracs[i] * potAfterCall);
     to = max(to, minTo);
     if (to < maxTo) tos[m++] = to;
   }
@@ -178,61 +230,125 @@ static int legal(const St& s, Act* out) {
   return n;
 }
 
+static inline int popc(int x) { return __builtin_popcount((unsigned)x); }
+
+static int firstPending(const St& s, int street) {
+  const int* o = ORD[street == 0 ? 0 : 1];
+  for (int i = 0; i < NP; i++) if ((s.pending >> o[i]) & 1) return o[i];
+  return -1;
+}
+
+static int nextPending(const St& s, int p) {
+  const int* o = ORD[s.street == 0 ? 0 : 1];
+  int pos = 0;
+  for (int i = 0; i < NP; i++) if (o[i] == p) pos = i;
+  for (int k = 1; k <= NP; k++) {
+    int q = o[(pos + k) % NP];
+    if ((s.pending >> q) & 1) return q;
+  }
+  return -1;
+}
+
 static St step(const St& s, Act a) {
   St t = s;
-  int p = s.toAct, o = 1 - p;
-  t.hist = mix(t.hist ^ (u64)(a.type == 2 ? a.to + 2 : a.type));
-  if (a.type == 0) { t.fold = true; t.folder = p; return t; }
-  t.nacts++;
-  if (a.type == 2) {
+  int p = s.toAct;
+  int maxBet = maxBetOf(s);
+  t.hist = mix(t.hist ^ (u64)(a.type == 2 ? a.to + 2 : a.type) ^ ((u64)(p + 1) << 50));
+  const int all = (1 << NP) - 1;
+  if (a.type == 0) {
+    t.folded |= 1 << p;
+    t.pending &= ~(1 << p);
+    int live = all & ~t.folded;
+    if (popc(live) == 1) { t.over = true; t.winner = __builtin_ctz(live); return t; }
+  } else if (a.type == 1) {
+    int pay = min(maxBet - s.bet[p], s.stack[p]);
+    t.stack[p] -= pay; t.bet[p] += pay;
+    t.pending &= ~(1 << p);
+  } else {
     t.stack[p] -= a.to - s.bet[p];
     t.bet[p] = a.to;
-    t.lastRaise = max(s.lastRaise, a.to - s.bet[o]);
+    t.lastRaise = max(s.lastRaise, a.to - maxBet);
     t.raises++;
-    t.toAct = o;
-    return t;
+    int pend = 0;
+    for (int i = 0; i < NP; i++)
+      if (i != p && !((t.folded >> i) & 1) && t.stack[i] > 0) pend |= 1 << i;
+    t.pending = pend;
   }
-  int facing = s.bet[o] - s.bet[p];
-  int pay = min(facing, s.stack[p]);
-  t.stack[p] -= pay; t.bet[p] += pay;
-  bool preflopLimp = (s.street == 0 && s.nacts == 0);
-  bool ends = facing > 0 ? !preflopLimp : s.nacts >= 1;
-  if (t.stack[0] == 0 || t.stack[1] == 0) ends = true;
-  if (!ends) { t.toAct = o; return t; }
-  if (t.stack[0] == 0 || t.stack[1] == 0 || s.street == 3) { t.showdown = true; return t; }
-  t.pot0 += t.bet[0] + t.bet[1];
-  t.bet[0] = t.bet[1] = 0;
-  t.street++; t.toAct = 1; t.nacts = 0; t.raises = 0; t.lastRaise = BB;
+  if (t.pending != 0) { t.toAct = nextPending(t, p); return t; }
+  // betting round is over
+  int canAct = 0;
+  for (int i = 0; i < NP; i++) if (!((t.folded >> i) & 1) && t.stack[i] > 0) canAct |= 1 << i;
+  if (t.street == 3 || popc(canAct) <= 1) { t.over = true; t.showdown = true; return t; }
+  for (int i = 0; i < NP; i++) { t.pot0 += t.bet[i]; t.bet[i] = 0; }
+  t.street++; t.raises = 0; t.lastRaise = BB; t.pending = canAct;
   t.hist = mix(t.hist ^ (u64)(1000 + t.street));
+  t.toAct = firstPending(t, t.street);
   return t;
 }
 
-struct Deal { int hole[2][2]; int board[5]; };
+struct Deal { int hole[MAXN][2]; int board[5]; };
 
 static void dealRandom(Deal& d, Rng& rng) {
   int deck[52];
   for (int i = 0; i < 52; i++) deck[i] = i;
-  for (int i = 0; i < 9; i++) swap(deck[i], deck[i + rng.below(52 - i)]);
-  d.hole[0][0] = deck[0]; d.hole[0][1] = deck[1]; d.hole[1][0] = deck[2]; d.hole[1][1] = deck[3];
-  for (int i = 0; i < 5; i++) d.board[i] = deck[4 + i];
+  int need = 2 * NP + 5;
+  for (int i = 0; i < need; i++) swap(deck[i], deck[i + rng.below(52 - i)]);
+  for (int p = 0; p < NP; p++) { d.hole[p][0] = deck[2 * p]; d.hole[p][1] = deck[2 * p + 1]; }
+  for (int i = 0; i < 5; i++) d.board[i] = deck[2 * NP + i];
 }
 
-// utility for player `pl` at a terminal state (net chips)
-static double util(const St& s, int pl, const Deal& d) {
-  int com[2] = {START - s.stack[0], START - s.stack[1]};
-  if (s.fold) return s.folder == pl ? -com[pl] : com[1 - pl];
-  int a[7], b[7];
-  for (int i = 0; i < 2; i++) { a[i] = d.hole[0][i]; b[i] = d.hole[1][i]; }
-  for (int i = 0; i < 5; i++) a[2 + i] = b[2 + i] = d.board[i];
-  int sa = eval(a, 7), sb = eval(b, 7), m = min(com[0], com[1]);
-  if (sa == sb) return 0;
-  bool p0wins = sa > sb;
-  return (p0wins == (pl == 0)) ? m : -m;
+// Distributes the pots (including side pots). comm[i] = chips player i put in, live[i] = not folded.
+// out[i] = net result of player i. Chips above the highest live commitment can't exist (they'd be uncalled).
+static void settle(const int* comm, const int* live, const int* score, int n, double* out) {
+  double won[MAXN] = {0};
+  int levels[MAXN], nl = 0;
+  for (int i = 0; i < n; i++) if (live[i]) levels[nl++] = comm[i];
+  sort(levels, levels + nl);
+  nl = (int)(unique(levels, levels + nl) - levels);
+  int prev = 0;
+  for (int li = 0; li < nl; li++) {
+    int L = levels[li];
+    double slice = 0;
+    for (int i = 0; i < n; i++) slice += max(0, min(comm[i], L) - min(comm[i], prev));
+    int bestScore = -1, cnt = 0;
+    for (int i = 0; i < n; i++)
+      if (live[i] && comm[i] >= L) {
+        if (score[i] > bestScore) { bestScore = score[i]; cnt = 1; }
+        else if (score[i] == bestScore) cnt++;
+      }
+    for (int i = 0; i < n; i++)
+      if (live[i] && comm[i] >= L && score[i] == bestScore) won[i] += slice / cnt;
+    prev = L;
+  }
+  for (int i = 0; i < n; i++) out[i] = won[i] - comm[i];
 }
 
-static int bucketOf(const Deal& d, int p, int street) {
+// net chips of every player at a finished hand
+static void payoffs(const St& s, const Deal& d, double* out) {
+  int comm[MAXN], live[MAXN], score[MAXN] = {0};
+  for (int i = 0; i < NP; i++) { comm[i] = START - s.stack[i]; live[i] = !((s.folded >> i) & 1); }
+  if (!s.showdown) {
+    int total = 0;
+    for (int i = 0; i < NP; i++) total += comm[i];
+    for (int i = 0; i < NP; i++) out[i] = (i == s.winner ? total : 0) - comm[i];
+    return;
+  }
+  for (int i = 0; i < NP; i++) {
+    if (!live[i]) continue;
+    int c[7] = {d.hole[i][0], d.hole[i][1], d.board[0], d.board[1], d.board[2], d.board[3], d.board[4]};
+    score[i] = eval(c, 7);
+  }
+  settle(comm, live, score, NP, out);
+}
+
+static inline int liveOpponents(const St& s, int p) {
+  int live = ((1 << NP) - 1) & ~s.folded & ~(1 << p);
+  return popc(live);
+}
+
+static int bucketOf(const Deal& d, int p, int street, int k) {
   if (street == 0) return canon169(d.hole[p][0], d.hole[p][1]);
-  return eqBucket(d.hole[p], d.board, 2 + street);
+  return eqBucket(d.hole[p], d.board, 2 + street, k);
 }
 
 static u64 infoKey(const St& s, int p, int bucket) {
@@ -282,15 +398,16 @@ static inline void regretMatch(const Slot& nd, float* st) {
   for (int i = 0; i < nd.n; i++) st[i] = tot > 0 ? max(0.f, nd.reg[i]) / tot : 1.f / nd.n;
 }
 
-struct Ctx { Deal d; int bk[2][4]; float w; };
+struct Ctx { Deal d; int bk[MAXN][4][MAXN]; float w; };
 
 static double trav(const St& s, int tr, Ctx& c, Rng& rng) {
-  if (s.fold || s.showdown) return util(s, tr, c.d);
+  if (s.over) { double u[MAXN]; payoffs(s, c.d, u); return u[tr]; }
   int p = s.toAct;
   Act acts[MAXA];
   int n = legal(s, acts);
-  int& b = c.bk[p][s.street];
-  if (b < 0) b = bucketOf(c.d, p, s.street);
+  int k = liveOpponents(s, p);
+  int& b = c.bk[p][s.street][k];
+  if (b < 0) b = bucketOf(c.d, p, s.street, k);
   Slot& nd = slotFor(infoKey(s, p, b), n);
   float st[MAXA];
   regretMatch(nd, st);
@@ -310,23 +427,27 @@ static double trav(const St& s, int tr, Ctx& c, Rng& rng) {
 // ---------------------------------------------------------------- files
 struct Hdr {
   int magic, kind;            // kind 1 = strategy (play), 2 = checkpoint (resume)
-  int start, nbuck, maxr, eqs, nfr;
-  float fr[MAXSIZES];
+  int np, start, nbuck, maxr, pmaxr, eqs, nfr, npfr;
+  float fr[MAXSIZES], pfr[MAXSIZES];
   long long iters, count, round;
 };
-static const int MAGIC = 0x48454448;
+static const int MAGIC = 0x4845444A;
 
 static Hdr makeHdr(int kind, long long iters, long long count, long long round) {
   Hdr h{};
-  h.magic = MAGIC; h.kind = kind; h.start = START; h.nbuck = NBUCK; h.maxr = MAXR; h.eqs = EQSAMPLES;
+  h.magic = MAGIC; h.kind = kind; h.np = NP; h.start = START; h.nbuck = NBUCK; h.maxr = MAXR; h.pmaxr = PMAXR; h.eqs = EQSAMPLES;
   h.nfr = (int)FRACS.size();
   for (int i = 0; i < h.nfr; i++) h.fr[i] = (float)FRACS[i];
+  h.npfr = (int)PFRACS.size();
+  for (int i = 0; i < h.npfr; i++) h.pfr[i] = (float)PFRACS[i];
   h.iters = iters; h.count = count; h.round = round;
   return h;
 }
 static void applyHdr(const Hdr& h) {
-  START = h.start; NBUCK = h.nbuck; MAXR = h.maxr; EQSAMPLES = h.eqs;
+  NP = h.np; START = h.start; NBUCK = h.nbuck; MAXR = h.maxr; PMAXR = h.pmaxr; EQSAMPLES = h.eqs;
   FRACS.assign(h.fr, h.fr + h.nfr);
+  PFRACS.assign(h.pfr, h.pfr + h.npfr);
+  initOrders();
 }
 
 // rename() refuses to overwrite an existing file on Windows
@@ -424,32 +545,29 @@ static bool loadStrategy(const string& path, Strat& S, Hdr* hout = nullptr) {
   return true;
 }
 
-// Chooses an action index for the player to act. Unknown situations default to check/call.
-static int botChoose(const Strat& S, const St& s, const Deal& d, Act* acts, int n, Rng& rng) {
-  int p = s.toAct;
-  auto it = S.m.find(infoKey(s, p, bucketOf(d, p, s.street)));
-  if (it == S.m.end() || it->second[0] != n) {
+static int pickWeighted(const float* w, int n, const Act* acts, Rng& rng, bool ok) {
+  float tot = 0;
+  if (ok) for (int i = 0; i < n; i++) tot += w[i];
+  if (!ok || tot <= 0) {   // unknown situation: check/call
     for (int i = 0; i < n; i++) if (acts[i].type == 1) return i;
     return 0;
   }
-  int tot = 0;
-  for (int i = 0; i < n; i++) tot += it->second[1 + i];
-  if (tot == 0) return 0;
-  int r = rng.below(tot), acc = 0;
-  for (int i = 0; i < n; i++) { acc += it->second[1 + i]; if (r < acc) return i; }
+  double r = rng.uni() * tot, acc = 0;
+  for (int i = 0; i < n; i++) { acc += w[i]; if (r < acc) return i; }
   return n - 1;
 }
 
-// ---------------------------------------------------------------- commands
-static string actStr(const St& s, Act a) {
-  int p = s.toAct, o = 1 - p;
-  if (a.type == 0) return "fold";
-  if (a.type == 1) { int f = s.bet[o] - s.bet[p]; return f > 0 ? "call " + to_string(min(f, s.stack[p])) : "check"; }
-  bool allin = a.to - s.bet[p] >= s.stack[p];
-  return string(s.bet[o] > 0 ? "raise to " : "bet ") + to_string(a.to) + (allin ? " (all-in)" : "");
+// Chooses an action index for the player to act from a strategy file.
+static int botChoose(const Strat& S, const St& s, const Deal& d, const Act* acts, int n, Rng& rng) {
+  int p = s.toAct;
+  auto it = S.m.find(infoKey(s, p, bucketOf(d, p, s.street, liveOpponents(s, p))));
+  float w[MAXA];
+  bool ok = it != S.m.end() && it->second[0] == n;
+  if (ok) for (int i = 0; i < n; i++) w[i] = it->second[1 + i];
+  return pickWeighted(w, n, acts, rng, ok);
 }
 
-// ---- progress check: current average strategy vs. a snapshot taken at the previous check
+// ---------------------------------------------------------------- progress check during training
 struct SnapRow { unsigned char p[MAXA]; unsigned char n; };
 static vector<SnapRow> snapshot;
 
@@ -480,7 +598,7 @@ static void takeSnapshot() {
 
 static int chooseFromTable(const St& s, const Deal& d, const Act* acts, int n, Rng& rng, bool useSnapshot) {
   int p = s.toAct;
-  long i = findSlot(infoKey(s, p, bucketOf(d, p, s.street)));
+  long i = findSlot(infoKey(s, p, bucketOf(d, p, s.street, liveOpponents(s, p))));
   float w[MAXA];
   bool ok = i >= 0;
   if (ok) {
@@ -494,18 +612,11 @@ static int chooseFromTable(const St& s, const Deal& d, const Act* acts, int n, R
       for (int k = 0; ok && k < n; k++) w[k] = nd.sum[k];
     }
   }
-  float tot = 0;
-  if (ok) for (int k = 0; k < n; k++) tot += w[k];
-  if (!ok || tot <= 0) {
-    for (int k = 0; k < n; k++) if (acts[k].type == 1) return k;
-    return 0;
-  }
-  double r = rng.uni() * tot, acc = 0;
-  for (int k = 0; k < n; k++) { acc += w[k]; if (r < acc) return k; }
-  return n - 1;
+  return pickWeighted(w, n, acts, rng, ok);
 }
 
-// mbb/hand of the current strategy against the snapshot, duplicate style (each deal played from both seats)
+// mbb/hand of the current strategy against the snapshot: every deal is played NP times, with the current strategy
+// in each seat once and the snapshot in all other seats (this removes most of the card luck and the position effect).
 static void evalVsSnapshot(long long deals, int threads, u64 seed, double& mean, double& ci) {
   vector<double> sum(threads, 0), sq(threads, 0);
   vector<long long> cnt(threads, 0);
@@ -516,14 +627,15 @@ static void evalVsSnapshot(long long deals, int threads, u64 seed, double& mean,
       for (long long g = t; g < deals; g += threads) {
         Deal d; dealRandom(d, rng);
         double x = 0;
-        for (int cur = 0; cur < 2; cur++) {
+        for (int cur = 0; cur < NP; cur++) {
           St s = newHand();
-          while (!(s.fold || s.showdown)) {
+          while (!s.over) {
             Act acts[MAXA];
             int n = legal(s, acts);
             s = step(s, acts[chooseFromTable(s, d, acts, n, rng, s.toAct != cur)]);
           }
-          x += util(s, cur, d) / 2;
+          double u[MAXN]; payoffs(s, d, u);
+          x += u[cur] / NP;
         }
         sum[t] += x; sq[t] += x * x; cnt[t]++;
       }
@@ -536,6 +648,7 @@ static void evalVsSnapshot(long long deals, int threads, u64 seed, double& mean,
   ci = 1.96 * sqrt(max(var, 0.0) / N);
 }
 
+// ---------------------------------------------------------------- commands
 static atomic<bool> g_stop{false};
 static void onSigint(int) { g_stop = true; }
 
@@ -544,7 +657,7 @@ struct TrainOpts {
   int threads = 1, logSlots = 24;
   long long roundIters = 1000000;
   long long evalEvery = 0;      // iterations between "current vs previous snapshot" checks (0 = off)
-  long long evalDeals = 100000;
+  long long evalDeals = 50000;
   string out = "strategy.bin", resume;
 };
 
@@ -561,9 +674,11 @@ static int cmdTrain(const TrainOpts& o) {
   signal(SIGINT, onSigint);
   const string stopFile = o.out + ".stop";   // creating this file asks training to finish the round, save and exit
   remove(stopFile.c_str());
-  printf("stack %d bb, %d buckets, sizes", START / BB, NBUCK);
+  printf("%d players, stack %d bb, %d buckets, sizes", NP, START / BB, NBUCK);
   for (double f : FRACS) printf(" %.2f", f);
-  printf(", max %d raises, %d threads, table %.1f GB\n", MAXR, o.threads, tableSize * sizeof(Slot) / 1e9);
+  printf(" (postflop");
+  for (double f : PFRACS) printf(" %.2f", f);
+  printf("), max raises %d/%d, %d threads, table %.1f GB\n", MAXR, PMAXR, o.threads, tableSize * sizeof(Slot) / 1e9);
   auto t0 = chrono::steady_clock::now();
   auto lastSave = t0;
   long long start = done;
@@ -581,7 +696,7 @@ static int cmdTrain(const TrainOpts& o) {
         c.w = (float)round;
         for (long long i = 0; i < per; i++) {
           dealRandom(c.d, rng);
-          for (int tr = 0; tr < 2; tr++) {
+          for (int tr = 0; tr < NP; tr++) {
             memset(c.bk, -1, sizeof c.bk);
             trav(newHand(), tr, c, rng);
           }
@@ -615,78 +730,92 @@ static int cmdTrain(const TrainOpts& o) {
   return 0;
 }
 
+static string actStr(const St& s, Act a) {
+  int p = s.toAct;
+  if (a.type == 0) return "fold";
+  int maxBet = maxBetOf(s);
+  if (a.type == 1) { int f = maxBet - s.bet[p]; return f > 0 ? "call " + to_string(min(f, s.stack[p])) : "check"; }
+  bool allin = a.to - s.bet[p] >= s.stack[p];
+  return string(maxBet > 0 ? "raise to " : "bet ") + to_string(a.to) + (allin ? " (all-in)" : "");
+}
+
 enum Policy { P_BOT, P_RANDOM, P_CALL, P_AGGRO };
 
-static int policyChoose(Policy pol, const Strat& S, const St& s, const Deal& d, Act* acts, int n, Rng& rng) {
+static int policyChoose(Policy pol, const Strat& S, const St& s, const Deal& d, const Act* acts, int n, Rng& rng) {
   if (pol == P_BOT) return botChoose(S, s, d, acts, n, rng);
   if (pol == P_RANDOM) return rng.below(n);
   if (pol == P_CALL) { for (int i = 0; i < n; i++) if (acts[i].type == 1) return i; }
-  // aggro: smallest raise if available else call
-  for (int i = 0; i < n; i++) if (acts[i].type == 2) return i;
+  for (int i = 0; i < n; i++) if (acts[i].type == 2) return i;   // aggro: smallest raise if available else call
   for (int i = 0; i < n; i++) if (acts[i].type == 1) return i;
   return 0;
 }
 
+// Bot (strategy file) against simple baseline bots. Each deal is played NP times, the bot sits in every seat once.
 static int cmdEval(const string& path, long long hands) {
   Strat S;
   if (!loadStrategy(path, S)) { fprintf(stderr, "cannot load %s\n", path.c_str()); return 1; }
-  printf("stack %d bb, %zu infosets\n", START / BB, S.m.size());
+  printf("%d players, stack %d bb, %zu infosets\n", NP, START / BB, S.m.size());
   Rng rng(12345);
   const char* names[] = {"bot", "random", "always call", "always raise (min)"};
   for (int opp = P_RANDOM; opp <= P_AGGRO; opp++) {
     double total = 0, sq = 0;
-    for (long long h = 0; h < hands; h++) {
+    long long deals = max(1LL, hands / NP);
+    for (long long g = 0; g < deals; g++) {
       Deal d; dealRandom(d, rng);
-      int botSeat = (int)(h & 1);
-      St s = newHand();
-      while (!(s.fold || s.showdown)) {
-        Act acts[MAXA];
-        int n = legal(s, acts);
-        Policy pol = s.toAct == botSeat ? P_BOT : (Policy)opp;
-        s = step(s, acts[policyChoose(pol, S, s, d, acts, n, rng)]);
+      double x = 0;
+      for (int seat = 0; seat < NP; seat++) {
+        St s = newHand();
+        while (!s.over) {
+          Act acts[MAXA];
+          int n = legal(s, acts);
+          Policy pol = s.toAct == seat ? P_BOT : (Policy)opp;
+          s = step(s, acts[policyChoose(pol, S, s, d, acts, n, rng)]);
+        }
+        double u[MAXN]; payoffs(s, d, u);
+        x += u[seat] / NP;
       }
-      double u = util(s, botSeat, d);
-      total += u; sq += u * u;
+      total += x; sq += x * x;
     }
-    double mean = total / hands, var = sq / hands - mean * mean;
-    double se = sqrt(max(var, 0.0) / hands);
+    double mean = total / deals, var = sq / deals - mean * mean;
+    double se = sqrt(max(var, 0.0) / deals);
     printf("bot vs %-20s %+9.1f mbb/hand  (+-%.1f)\n", names[opp], mean / BB * 1000, se / BB * 1000 * 1.96);
   }
   return 0;
 }
 
-// Duplicate-style match between two strategies trained with the same game settings: every deal is played twice
-// with the seats swapped, which removes most of the card luck.
+// One copy of strategy A against NP-1 copies of strategy B (A in every seat once per deal).
 static int cmdCompare(const string& pa, const string& pb, long long hands) {
   Strat A, B;
   Hdr ha, hb;
   if (!loadStrategy(pa, A, &ha) || !loadStrategy(pb, B, &hb)) { fprintf(stderr, "cannot load strategy files\n"); return 1; }
-  bool same = ha.start == hb.start && ha.nbuck == hb.nbuck && ha.maxr == hb.maxr && ha.eqs == hb.eqs && ha.nfr == hb.nfr;
+  bool same = ha.np == hb.np && ha.start == hb.start && ha.nbuck == hb.nbuck && ha.maxr == hb.maxr && ha.pmaxr == hb.pmaxr && ha.eqs == hb.eqs && ha.nfr == hb.nfr && ha.npfr == hb.npfr;
   for (int i = 0; same && i < ha.nfr; i++) same = ha.fr[i] == hb.fr[i];
+  for (int i = 0; same && i < ha.npfr; i++) same = ha.pfr[i] == hb.pfr[i];
   if (!same) { fprintf(stderr, "the two strategies were trained with different game settings, they cannot play each other\n"); return 1; }
   applyHdr(ha);
   Rng rng(98765);
   double sum = 0, sq = 0;
-  long long deals = max(1LL, hands / 2);
+  long long deals = max(1LL, hands / NP);
   for (long long g = 0; g < deals; g++) {
     Deal d; dealRandom(d, rng);
     double x = 0;
-    for (int seatA = 0; seatA < 2; seatA++) {
+    for (int seatA = 0; seatA < NP; seatA++) {
       St s = newHand();
-      while (!(s.fold || s.showdown)) {
+      while (!s.over) {
         Act acts[MAXA];
         int n = legal(s, acts);
         const Strat& S = s.toAct == seatA ? A : B;
         s = step(s, acts[botChoose(S, s, d, acts, n, rng)]);
       }
-      x += util(s, seatA, d) / 2;
+      double u[MAXN]; payoffs(s, d, u);
+      x += u[seatA] / NP;
     }
     sum += x; sq += x * x;
   }
   double mean = sum / deals, var = sq / deals - mean * mean, se = sqrt(max(var, 0.0) / deals);
-  printf("stack %d bb | %lld deals x 2 seats\n", START / BB, deals);
+  printf("%d players, stack %d bb | %lld deals, A in every seat once per deal\n", NP, START / BB, deals);
   printf("A = %s (%zu infosets)\nB = %s (%zu infosets)\n", pa.c_str(), A.m.size(), pb.c_str(), B.m.size());
-  printf("A vs B: %+.1f mbb/hand (+-%.1f, 95%%)   [positive = A is stronger]\n", mean / BB * 1000, se / BB * 1000 * 1.96);
+  printf("A vs %d x B: %+.1f mbb/hand (+-%.1f, 95%%)   [positive = A is stronger]\n", NP - 1, mean / BB * 1000, se / BB * 1000 * 1.96);
   return 0;
 }
 
@@ -702,22 +831,28 @@ static int cmdPlay(const string& path) {
   Rng rng((u64)chrono::steady_clock::now().time_since_epoch().count());
   double total = 0;
   int hands = 0;
-  printf("Heads-up NLHE, %d bb stacks, blinds %d/%d. Type the number of your action, q to quit.\n", START / BB, SB, BB);
-  printf("(You can only choose from the bot's bet sizes.)\n\n");
+  printf("%d players, %d bb stacks, blinds %d/%d. Type the number of your action, q to quit.\n", NP, START / BB, SB, BB);
+  printf("(You can only choose from the bots' bet sizes. Your seat rotates every hand; the bots all play the same strategy.)\n\n");
   while (true) {
     Deal d; dealRandom(d, rng);
-    int me = hands % 2;   // seat 0 = button
+    int me = hands % NP;
     hands++;
     St s = newHand();
-    printf("=== hand %d | you are %s | your cards: %s\n", hands, me == 0 ? "button/SB" : "BB", showCards(d.hole[me], 2).c_str());
+    printf("=== hand %d | you are %s | your cards: %s\n", hands, seatName(me).c_str(), showCards(d.hole[me], 2).c_str());
     int shown = 0;
-    while (!(s.fold || s.showdown)) {
-      if (s.street > shown) { shown = s.street; printf("board: %s\n", showCards(d.board, 2 + s.street).c_str()); }
+    while (!s.over) {
+      if (s.street > shown) {
+        shown = s.street;
+        int total_pot = s.pot0;
+        for (int i = 0; i < NP; i++) total_pot += s.bet[i];
+        printf("--- board: %s   (pot %d)\n", showCards(d.board, 2 + s.street).c_str(), total_pot);
+      }
       Act acts[MAXA];
       int n = legal(s, acts);
-      int pot = s.pot0 + s.bet[0] + s.bet[1];
       if (s.toAct == me) {
-        printf("pot %d | you %d behind (bet %d) | bot %d behind (bet %d)\n", pot, s.stack[me], s.bet[me], s.stack[1 - me], s.bet[1 - me]);
+        int pot = s.pot0;
+        for (int i = 0; i < NP; i++) pot += s.bet[i];
+        printf("pot %d | you %d behind (bet %d) | to call %d\n", pot, s.stack[me], s.bet[me], maxBetOf(s) - s.bet[me]);
         for (int i = 0; i < n; i++) printf("  [%d] %s\n", i + 1, actStr(s, acts[i]).c_str());
         int ch = 0;
         while (true) {
@@ -730,14 +865,19 @@ static int cmdPlay(const string& path) {
         s = step(s, acts[ch - 1]);
       } else {
         int i = botChoose(S, s, d, acts, n, rng);
-        printf("bot: %s\n", actStr(s, acts[i]).c_str());
+        printf("%s: %s\n", seatName(s.toAct).c_str(), actStr(s, acts[i]).c_str());
         s = step(s, acts[i]);
       }
     }
-    double u = util(s, me, d);
-    total += u;
-    if (!s.fold) printf("showdown: bot has %s | board %s\n", showCards(d.hole[1 - me], 2).c_str(), showCards(d.board, 5).c_str());
-    printf("result: %+.1f bb | session: %+.1f bb\n\n", u / BB, total / BB);
+    double u[MAXN];
+    payoffs(s, d, u);
+    total += u[me];
+    if (s.showdown) {
+      printf("showdown:");
+      for (int i = 0; i < NP; i++) if (!((s.folded >> i) & 1) && i != me) printf("  %s %s", seatName(i).c_str(), showCards(d.hole[i], 2).c_str());
+      printf("  | board %s\n", showCards(d.board, 5).c_str());
+    }
+    printf("result: %+.1f bb | session: %+.1f bb\n\n", u[me] / BB, total / BB);
   }
 }
 
@@ -770,50 +910,73 @@ static int cmdTest() {
 
   // 3. buckets deterministic and sensible
   int aa[2] = {C("Ah"), C("Ad")}, seven2[2] = {C("7c"), C("2d")}, flop[3] = {C("As"), C("Kd"), C("3c")};
-  check(eqBucket(aa, flop, 3) == eqBucket(aa, flop, 3), "bucket deterministic");
-  check(eqBucket(aa, flop, 3) > eqBucket(seven2, flop, 3), "set of aces ranks above 7-2 on A-K-3");
-  check(canon169(C("Ah"), C("Ad")) != canon169(C("Ah"), C("Kd")) && canon169(C("Ah"), C("Kh")) != canon169(C("Ah"), C("Kd")), "preflop classes distinct");
+  check(eqBucket(aa, flop, 3, 1) == eqBucket(aa, flop, 3, 1), "bucket deterministic");
+  check(eqBucket(aa, flop, 3, 1) > eqBucket(seven2, flop, 3, 1), "set of aces ranks above 7-2 on A-K-3");
+  check(eqBucket(aa, flop, 3, 4) > eqBucket(seven2, flop, 3, 4), "same, 4 opponents");
   { set<int> seen; for (int a = 0; a < 52; a++) for (int b = a + 1; b < 52; b++) seen.insert(canon169(a, b)); check(seen.size() == 169, "169 preflop classes"); }
 
-  // 4. random playouts: zero-sum, chips conserved, terminate
-  Rng rng(7);
-  bool ok = true;
-  long long streets[4] = {0};
-  for (int g = 0; g < 200000 && ok; g++) {
-    Deal d; dealRandom(d, rng);
-    St s = newHand();
-    int steps = 0;
-    while (!(s.fold || s.showdown)) {
-      Act acts[MAXA];
-      int n = legal(s, acts);
-      if (n < 1 || ++steps > 60) { ok = false; break; }
-      if (s.stack[0] < 0 || s.stack[1] < 0) { ok = false; break; }
-      s = step(s, acts[rng.below(n)]);
-    }
-    if (!ok) break;
-    streets[s.street]++;
-    ok &= fabs(util(s, 0, d) + util(s, 1, d)) < 1e-9;
-    ok &= s.stack[0] >= 0 && s.stack[1] >= 0;
+  // 4. side pots
+  {
+    int comm[3] = {100, 50, 20}, live[3] = {1, 1, 1}, score[3] = {1, 2, 3};
+    double out[MAXN];
+    settle(comm, live, score, 3, out);
+    check(fabs(out[0] + 50) < 1e-9 && fabs(out[1] - 10) < 1e-9 && fabs(out[2] - 40) < 1e-9, "side pots: 100/50/20 all-in, best hand has the smallest stack");
+    int comm2[4] = {30, 30, 30, 10}, live2[4] = {1, 1, 0, 1}, score2[4] = {5, 5, 0, 1};
+    settle(comm2, live2, score2, 4, out);
+    check(fabs(out[0] - 20) < 1e-9 && fabs(out[1] - 20) < 1e-9 && fabs(out[2] + 30) < 1e-9 && fabs(out[3] + 10) < 1e-9, "split pot with a folded player's dead money");
   }
-  check(ok, "200k random hands: terminate, stacks >= 0, zero-sum");
-  printf("     (hands ending on street 0..3: %lld %lld %lld %lld)\n", streets[0], streets[1], streets[2], streets[3]);
 
-  // 5. all-in action set sanity
+  // 5. random playouts for every table size: terminate, zero-sum, chips conserved, no negative stacks
+  for (int np = 2; np <= MAXN; np++) {
+    NP = np; initOrders();
+    Rng rng(7 + np);
+    bool ok = true;
+    long long showdowns = 0, folds = 0;
+    for (int g = 0; g < 100000 && ok; g++) {
+      Deal d; dealRandom(d, rng);
+      St s = newHand();
+      int steps = 0;
+      while (!s.over) {
+        Act acts[MAXA];
+        int n = legal(s, acts);
+        if (n < 1 || ++steps > 200) { ok = false; break; }
+        s = step(s, acts[rng.below(n)]);
+        for (int i = 0; i < NP; i++) if (s.stack[i] < 0) ok = false;
+      }
+      if (!ok) break;
+      double u[MAXN], tot = 0;
+      payoffs(s, d, u);
+      for (int i = 0; i < NP; i++) tot += u[i];
+      ok &= fabs(tot) < 1e-6;
+      (s.showdown ? showdowns : folds)++;
+    }
+    char msg[100];
+    snprintf(msg, sizeof msg, "%d players: 100k random hands terminate, zero-sum (showdowns %lld, fold wins %lld)", np, showdowns, folds);
+    check(ok, msg);
+  }
+  NP = 2; initOrders();
   { St s = newHand(); Act a[MAXA]; int n = legal(s, a);
     string acts; for (int i = 0; i < n; i++) acts += actStr(s, a[i]) + "; ";
-    printf("     SB first action: %s\n", acts.c_str());
+    printf("     heads-up SB first action: %s\n", acts.c_str());
     check(n >= 4, "SB has fold/call/raise options"); }
+  { NP = 6; initOrders(); St s = newHand();
+    check(s.toAct == 3, "6-max: UTG acts first preflop");
+    Act a[MAXA]; int n = legal(s, a);
+    s = step(s, a[0]);   // UTG folds
+    check(s.toAct == 4, "6-max: HJ acts next");
+    NP = 2; initOrders(); }
   printf("%s\n", fails ? "SOME TESTS FAILED" : "all tests passed");
   return fails != 0;
 }
 
 int main(int argc, char** argv) {
-  if (argc < 2) { fprintf(stderr, "usage: holdem test | train | play FILE | eval FILE\n"); return 1; }
+  if (argc < 2) { fprintf(stderr, "usage: holdem test | train | play FILE | eval FILE | compare A B\n"); return 1; }
   string cmd = argv[1];
   auto arg = [&](const char* name, const char* def) -> string {
     for (int i = 2; i + 1 < argc; i++) if (!strcmp(argv[i], name)) return argv[i + 1];
     return def;
   };
+  initOrders();
   if (cmd == "test") return cmdTest();
   if (cmd == "train") {
     TrainOpts o;
@@ -824,22 +987,30 @@ int main(int argc, char** argv) {
     o.out = arg("--out", "strategy.bin");
     o.resume = arg("--resume", "");
     o.evalEvery = atoll(arg("--eval-every", "0").c_str());
-    o.evalDeals = atoll(arg("--eval-deals", "100000").c_str());
+    o.evalDeals = atoll(arg("--eval-deals", "50000").c_str());
     if (o.resume.empty()) {
+      NP = atoi(arg("--players", "2").c_str());
+      if (NP < 2 || NP > MAXN) { fprintf(stderr, "--players must be 2..%d\n", MAXN); return 1; }
+      initOrders();
       START = BB * atoi(arg("--stack", "20").c_str());
       NBUCK = atoi(arg("--buckets", "24").c_str());
       MAXR = atoi(arg("--maxraises", "3").c_str());
+      PMAXR = atoi(arg("--post-maxraises", to_string(MAXR).c_str()).c_str());
       EQSAMPLES = atoi(arg("--eqsamples", "100").c_str());
       string sz = arg("--sizes", "0.5,1.0");
-      FRACS.clear();
-      stringstream ss(sz);
-      string tok;
-      while (getline(ss, tok, ',') && FRACS.size() < (size_t)MAXSIZES) FRACS.push_back(atof(tok.c_str()));
+      auto parse = [](const string& text, vector<double>& out) {
+        out.clear();
+        stringstream ss(text);
+        string tok;
+        while (getline(ss, tok, ',') && out.size() < (size_t)MAXSIZES) out.push_back(atof(tok.c_str()));
+      };
+      parse(sz, FRACS);
+      parse(arg("--post-sizes", sz.c_str()), PFRACS);
     }
     return cmdTrain(o);
   }
   if (cmd == "play" && argc >= 3) return cmdPlay(argv[2]);
-  if (cmd == "compare" && argc >= 4) return cmdCompare(argv[2], argv[3], atoll(arg("--hands", "200000").c_str()));
+  if (cmd == "compare" && argc >= 4) return cmdCompare(argv[2], argv[3], atoll(arg("--hands", "100000").c_str()));
   if (cmd == "eval" && argc >= 3) return cmdEval(argv[2], atoll(arg("--hands", "50000").c_str()));
   fprintf(stderr, "bad arguments\n");
   return 1;

@@ -2,18 +2,20 @@ POKERAI - szybki start (Windows)
 ================================
 
 1) Zagraj od razu (bez Pythona):
-   dwuklik na  PLAY_20bb.bat
-   Wpisz numer akcji i Enter. "q" konczy gre.
+   - PLAY_20bb.bat   -> 1 na 1 (heads-up), stacki 20 bb
+   - PLAY_6max.bat   -> stol na 6 osob (Ty + 5 botow), stacki 20 bb (jesli jest plik strategies\6max_20bb_lite.bin)
+   Wpisz numer akcji i Enter. "q" konczy gre. Twoja pozycja przy stole zmienia sie co rozdanie.
 
 2) Trenowanie z okienkiem:
    - zainstaluj Python 3 z python.org (zaznacz "Add Python to PATH"),
    - dwuklik na  START_GUI.bat
    - wybierz Preset, kliknij "Start new training".
-   Dla Twojego 7800X3D / 64 GB: preset "Deep (100 bb, overnight)", CPU threads = 14.
-   "Stop and save" zatrzymuje z zapisem, "Resume" wznawia, "Evaluate" testuje,
-   "Play" uruchamia gre z botem. Pliki wynikowe: folder strategies\ (moga miec GB).
+   Presety: heads-up 20 bb, heads-up 100 bb (na noc), 3 osoby, 6-max lite (szybki), 6-max standard (na noc).
+   Dla 7800X3D / 64 GB: CPU threads = 14. "Stop and save" zatrzymuje z zapisem, "Resume" wznawia,
+   "Evaluate" testuje z prostymi botami, "Compare" porownuje dwa pliki, "Play" uruchamia gre.
+   Plik wynikowy (Output file) ustaw np. strategies\6max_20bb_lite.bin.
 
 3) Windows moze ostrzegac przy holdem.exe (nieznany program). Plik jest zbudowany
    z kodu holdem\holdem.cpp, ktory masz w tym folderze.
 
-Szczegoly: README.md
+Ograniczenia i plan: PLAN.md. Szczegoly: README.md
