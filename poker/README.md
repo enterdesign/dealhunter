@@ -46,6 +46,8 @@ g++ -O3 -march=native -std=c++17 -pthread holdem.cpp -o holdem    # Windows: Min
 ./holdem compare new.bin old.bin --hands 200000   # which of two strategies is stronger (duplicate-style, seats swapped)
 ```
 
+During training `--eval-every N` (GUI: "Check vs previous every") plays the current bot against a snapshot of itself from the previous check and prints `EVAL ...` lines. Positive beyond the printed +- = still improving; around 0 = converged for these settings.
+
 Is more training better? Save a snapshot (GUI button), train on, then `compare` the new file with the snapshot:
 a clearly positive result (beyond the printed +-) means the extra training helped; around 0 means it has converged for this abstraction.
 

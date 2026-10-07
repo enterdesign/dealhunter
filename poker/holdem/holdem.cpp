@@ -4,6 +4,7 @@
 //   ./holdem test
 //   ./holdem train --stack 100 --iters 2000000000 --threads 16 --slots 27 --out s100.bin   (Ctrl+C = save and stop)
 //   ./holdem train --resume s100.bin.ckpt --iters 2000000000 --out s100.bin           (continue training)
+//   (add --eval-every 50000000 to print "current vs previous snapshot" progress checks during training)
 //   ./holdem play strategy.bin
 //   ./holdem eval strategy.bin --hands 100000
 //   ./holdem compare new.bin old.bin --hands 200000      (which of two strategies is stronger)
@@ -448,6 +449,93 @@ static string actStr(const St& s, Act a) {
   return string(s.bet[o] > 0 ? "raise to " : "bet ") + to_string(a.to) + (allin ? " (all-in)" : "");
 }
 
+// ---- progress check: current average strategy vs. a snapshot taken at the previous check
+struct SnapRow { unsigned char p[MAXA]; unsigned char n; };
+static vector<SnapRow> snapshot;
+
+static long findSlot(u64 key) {
+  if (key == 0) key = 1;
+  size_t i = key & tableMask;
+  for (int probe = 0; probe < 5000; probe++) {
+    u64 k = table[i].key.load(memory_order_relaxed);
+    if (k == key) return (long)i;
+    if (k == 0) return -1;
+    i = (i + 1) & tableMask;
+  }
+  return -1;
+}
+
+static void takeSnapshot() {
+  snapshot.assign(tableSize, SnapRow{});
+  for (size_t i = 0; i < tableSize; i++) {
+    const Slot& nd = table[i];
+    if (!nd.key.load(memory_order_relaxed)) continue;
+    float tot = 0;
+    for (int k = 0; k < nd.n; k++) tot += nd.sum[k];
+    if (tot <= 0) continue;
+    snapshot[i].n = nd.n;
+    for (int k = 0; k < nd.n; k++) snapshot[i].p[k] = (unsigned char)lround(255.0 * nd.sum[k] / tot);
+  }
+}
+
+static int chooseFromTable(const St& s, const Deal& d, const Act* acts, int n, Rng& rng, bool useSnapshot) {
+  int p = s.toAct;
+  long i = findSlot(infoKey(s, p, bucketOf(d, p, s.street)));
+  float w[MAXA];
+  bool ok = i >= 0;
+  if (ok) {
+    if (useSnapshot) {
+      const SnapRow& r = snapshot[i];
+      ok = r.n == n;
+      for (int k = 0; ok && k < n; k++) w[k] = r.p[k];
+    } else {
+      const Slot& nd = table[i];
+      ok = nd.n == n;
+      for (int k = 0; ok && k < n; k++) w[k] = nd.sum[k];
+    }
+  }
+  float tot = 0;
+  if (ok) for (int k = 0; k < n; k++) tot += w[k];
+  if (!ok || tot <= 0) {
+    for (int k = 0; k < n; k++) if (acts[k].type == 1) return k;
+    return 0;
+  }
+  double r = rng.uni() * tot, acc = 0;
+  for (int k = 0; k < n; k++) { acc += w[k]; if (r < acc) return k; }
+  return n - 1;
+}
+
+// mbb/hand of the current strategy against the snapshot, duplicate style (each deal played from both seats)
+static void evalVsSnapshot(long long deals, int threads, u64 seed, double& mean, double& ci) {
+  vector<double> sum(threads, 0), sq(threads, 0);
+  vector<long long> cnt(threads, 0);
+  vector<thread> th;
+  for (int t = 0; t < threads; t++)
+    th.emplace_back([&, t]() {
+      Rng rng(mix(seed + 977 * t));
+      for (long long g = t; g < deals; g += threads) {
+        Deal d; dealRandom(d, rng);
+        double x = 0;
+        for (int cur = 0; cur < 2; cur++) {
+          St s = newHand();
+          while (!(s.fold || s.showdown)) {
+            Act acts[MAXA];
+            int n = legal(s, acts);
+            s = step(s, acts[chooseFromTable(s, d, acts, n, rng, s.toAct != cur)]);
+          }
+          x += util(s, cur, d) / 2;
+        }
+        sum[t] += x; sq[t] += x * x; cnt[t]++;
+      }
+    });
+  for (auto& x : th) x.join();
+  double S = 0, Q = 0; long long N = 0;
+  for (int t = 0; t < threads; t++) { S += sum[t]; Q += sq[t]; N += cnt[t]; }
+  mean = S / N;
+  double var = Q / N - mean * mean;
+  ci = 1.96 * sqrt(max(var, 0.0) / N);
+}
+
 static atomic<bool> g_stop{false};
 static void onSigint(int) { g_stop = true; }
 
@@ -455,6 +543,8 @@ struct TrainOpts {
   long long iters = 1000000;
   int threads = 1, logSlots = 24;
   long long roundIters = 1000000;
+  long long evalEvery = 0;      // iterations between "current vs previous snapshot" checks (0 = off)
+  long long evalDeals = 100000;
   string out = "strategy.bin", resume;
 };
 
@@ -477,6 +567,9 @@ static int cmdTrain(const TrainOpts& o) {
   auto t0 = chrono::steady_clock::now();
   auto lastSave = t0;
   long long start = done;
+  long long lastEval = done;
+  bool haveSnapshot = false;
+  if (o.evalEvery > 0 && !o.resume.empty()) { takeSnapshot(); haveSnapshot = true; }
   while (done < o.iters && !g_stop) {
     round++;
     long long per = max(1LL, min(o.roundIters, o.iters - done) / o.threads);
@@ -501,6 +594,15 @@ static int cmdTrain(const TrainOpts& o) {
            100.0 * used.load() / tableSize, (done - start) / sec, sec);
     fflush(stdout);
     if (FILE* sf = fopen(stopFile.c_str(), "rb")) { fclose(sf); remove(stopFile.c_str()); g_stop = true; }
+    if (o.evalEvery > 0 && done - lastEval >= o.evalEvery) {
+      if (haveSnapshot) {
+        double m, ci;
+        evalVsSnapshot(o.evalDeals, o.threads, (u64)round, m, ci);
+        printf("EVAL iter %lld: current vs snapshot from iter %lld: %+.1f mbb/hand (+-%.1f)\n", done, lastEval, m / BB * 1000, ci / BB * 1000);
+        fflush(stdout);
+      }
+      takeSnapshot(); haveSnapshot = true; lastEval = done;
+    }
     if (used.load() > tableSize * 0.85) { printf("table is 85%% full, stopping (use a larger --slots next time)\n"); break; }
     if (chrono::duration<double>(chrono::steady_clock::now() - lastSave).count() > 600) {
       saveFiles(o.out, done, round);
@@ -721,6 +823,8 @@ int main(int argc, char** argv) {
     o.roundIters = atoll(arg("--round", "1000000").c_str());
     o.out = arg("--out", "strategy.bin");
     o.resume = arg("--resume", "");
+    o.evalEvery = atoll(arg("--eval-every", "0").c_str());
+    o.evalDeals = atoll(arg("--eval-deals", "100000").c_str());
     if (o.resume.empty()) {
       START = BB * atoi(arg("--stack", "20").c_str());
       NBUCK = atoi(arg("--buckets", "24").c_str());

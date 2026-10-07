@@ -59,7 +59,8 @@ class App(tk.Tk):
         self.mem.grid(row=7, column=2, sticky="w", padx=4)
         self.vars["slots"].trace_add("write", lambda *a: self._mem())
         self._field(pf, "iters", "Iterations (target)", "20M", 8, hint="e.g. 500M, 3G, 3e9")
-        self._field(pf, "out", "Output file", os.path.join(BASE, "strategies", "my_strategy.bin"), 9, width=50)
+        self._field(pf, "evalevery", "Check vs previous every (iter.)", "5M", 9, hint="progress check: current bot vs its older self (0 = off)")
+        self._field(pf, "out", "Output file", os.path.join(BASE, "strategies", "my_strategy.bin"), 10, width=50)
         self._mem()
 
         bf = ttk.Frame(self, padding=(8, 4))
@@ -82,6 +83,8 @@ class App(tk.Tk):
         self.bar.pack(fill="x")
         self.stat = ttk.Label(sf, text="idle")
         self.stat.pack(anchor="w", pady=(4, 0))
+        self.chk = ttk.Label(sf, text="progress check: -", foreground="#06c")
+        self.chk.pack(anchor="w")
 
         self.log = tk.Text(self, height=14, state="disabled", font=("Courier", 9))
         self.log.pack(fill="both", expand=True, padx=8, pady=(4, 8))
@@ -145,6 +148,10 @@ class App(tk.Tk):
                 kind, val = self.q.get_nowait()
                 if kind == "line":
                     self._write(val)
+                    ev = core.parse_eval(val)
+                    if ev:
+                        verdict = "still improving" if ev["mbb"] - ev["ci"] > 0 else "no clear change (close to converged for these settings)"
+                        self.chk.config(text=f"progress check @ {ev['iters']:,}: {ev['mbb']:+.0f} +-{ev['ci']:.0f} mbb/hand vs bot from {ev['prev']:,} iterations ago: {verdict}")
                     pr = core.parse_progress(val)
                     if pr:
                         total = core.parse_count(self.vars["iters"].get())

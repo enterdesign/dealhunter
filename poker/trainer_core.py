@@ -4,10 +4,10 @@ import os, re, sys
 SLOT_BYTES = 72
 
 PRESETS = {
-    "Quick test (20 bb)":      dict(stack=20,  buckets=24, eqsamples=100, maxraises=3, sizes="0.5,1.0",       slots=22, iters="20M"),
-    "20 bb, thorough (finer cards)": dict(stack=20, buckets=50, eqsamples=150, maxraises=3, sizes="0.5,1.0", slots=25, iters="1G"),
-    "Medium (40 bb)":          dict(stack=40,  buckets=30, eqsamples=100, maxraises=3, sizes="0.5,1.0",       slots=25, iters="500M"),
-    "Deep (100 bb, overnight)": dict(stack=100, buckets=30, eqsamples=100, maxraises=3, sizes="0.33,0.75,1.5", slots=28, iters="3G"),
+    "Quick test (20 bb)":      dict(stack=20,  buckets=24, eqsamples=100, maxraises=3, sizes="0.5,1.0",       slots=22, iters="20M", evalevery="5M"),
+    "20 bb, thorough (finer cards)": dict(stack=20, buckets=50, eqsamples=150, maxraises=3, sizes="0.5,1.0", slots=25, iters="1G", evalevery="100M"),
+    "Medium (40 bb)":          dict(stack=40,  buckets=30, eqsamples=100, maxraises=3, sizes="0.5,1.0",       slots=25, iters="500M", evalevery="50M"),
+    "Deep (100 bb, overnight)": dict(stack=100, buckets=30, eqsamples=100, maxraises=3, sizes="0.33,0.75,1.5", slots=28, iters="3G", evalevery="200M"),
 }
 
 
@@ -33,7 +33,9 @@ def parse_sizes(text):
 
 def train_command(binary, p, resume=False):
     iters = str(parse_count(p["iters"]))
-    base = [binary, "train", "--iters", iters, "--threads", str(int(p["threads"])), "--slots", str(int(p["slots"])), "--out", p["out"]]
+    ev = parse_count(p.get("evalevery", "0") or "0")
+    base = [binary, "train", "--iters", iters, "--threads", str(int(p["threads"])), "--slots", str(int(p["slots"])), "--out", p["out"],
+            "--eval-every", str(ev)]
     if resume:
         return [binary, "train", "--resume", p["out"] + ".ckpt"] + base[2:]
     parse_sizes(p["sizes"])
@@ -51,6 +53,17 @@ def parse_progress(line):
         return None
     r, it, n, fill, rate, sec = m.groups()
     return dict(round=int(r), iters=int(it), infosets=int(n), fill=float(fill), rate=int(rate), seconds=int(sec))
+
+
+EVAL = re.compile(r"EVAL iter (\d+): current vs snapshot from iter (\d+): ([+-][\d.]+) mbb/hand \(\+-([\d.]+)\)")
+
+
+def parse_eval(line):
+    m = EVAL.search(line)
+    if not m:
+        return None
+    it, prev, mean, ci = m.groups()
+    return dict(iters=int(it), prev=int(prev), mbb=float(mean), ci=float(ci))
 
 
 def fmt_eta(done, total, rate):
