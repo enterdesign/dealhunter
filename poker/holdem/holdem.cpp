@@ -2,21 +2,25 @@
 //
 //   g++ -O2 -std=c++17 holdem.cpp -o holdem
 //   ./holdem test
-//   ./holdem train --iters 20000000 --out strategy.bin [--stack 20] [--buckets 24]
+//   ./holdem train --stack 100 --iters 2000000000 --threads 16 --slots 27 --out s100.bin   (Ctrl+C = save and stop)
+//   ./holdem train --resume s100.bin.ckpt --iters 2000000000 --out s100.bin           (continue training)
 //   ./holdem play strategy.bin
 //   ./holdem eval strategy.bin --hands 100000
 //
 // Abstraction (see README): fixed stack depth, bet sizes {0.5 pot, 1 pot, all-in}, max 3 raises per street,
 // preflop: 169 lossless hand classes, postflop: hand-equity buckets.
 #include <bits/stdc++.h>
+#include <csignal>
+#include <thread>
+#include <atomic>
 using namespace std;
 typedef uint64_t u64;
 
 static int START = 40, BB = 2, SB = 1;   // chips; stack = START (default 20 big blinds)
 static int NBUCK = 24, EQSAMPLES = 100, MAXR = 3;
-static const double FRACS[] = {0.5, 1.0};
-static const int NFRAC = 2;
-static const int MAXA = 2 + NFRAC + 1;   // fold, call, raises..., all-in
+static vector<double> FRACS = {0.5, 1.0};   // raise sizes as fractions of the pot (after calling)
+static const int MAXA = 7;                  // fold, call, up to 4 sizes, all-in
+static const int MAXSIZES = 4;
 
 // ---------------------------------------------------------------- utils
 static inline u64 mix(u64 x) {
@@ -159,8 +163,8 @@ static int legal(const St& s, Act* out) {
   int minTo = s.bet[o] + max(s.lastRaise, BB);
   if (minTo >= maxTo) { out[n++] = {2, maxTo}; return n; }
   int potAfterCall = s.pot0 + s.bet[0] + s.bet[1] + facing;
-  int tos[NFRAC + 1], m = 0;
-  for (int i = 0; i < NFRAC; i++) {
+  int tos[MAXSIZES + 1], m = 0;
+  for (size_t i = 0; i < FRACS.size(); i++) {
     int to = s.bet[o] + (int)llround(FRACS[i] * potAfterCall);
     to = max(to, minTo);
     if (to < maxTo) tos[m++] = to;
@@ -234,16 +238,49 @@ static u64 infoKey(const St& s, int p, int bucket) {
 }
 
 // ---------------------------------------------------------------- MCCFR
-struct Node { float reg[MAXA]; float sum[MAXA]; unsigned char n; };
-static unordered_map<u64, Node> nodes;
+// Lock-free open-addressing table shared by all training threads (updates are racy on purpose, "hogwild").
+struct Slot {
+  atomic<u64> key;
+  float reg[MAXA];
+  float sum[MAXA];
+  unsigned char n;
+};
+static Slot* table = nullptr;
+static size_t tableSize = 0, tableMask = 0;
+static atomic<size_t> used{0};
 
-static inline void regretMatch(const Node& nd, float* st) {
+static void allocTable(int logSlots) {
+  tableSize = (size_t)1 << logSlots;
+  tableMask = tableSize - 1;
+  table = (Slot*)calloc(tableSize, sizeof(Slot));
+  if (!table) { fprintf(stderr, "cannot allocate %.1f GB, use a smaller --slots\n", tableSize * sizeof(Slot) / 1e9); exit(1); }
+}
+
+static Slot& slotFor(u64 key, int n) {
+  if (key == 0) key = 1;
+  size_t i = key & tableMask;
+  for (size_t probe = 0;; probe++) {
+    u64 k = table[i].key.load(memory_order_relaxed);
+    if (k == key) break;
+    if (k == 0) {
+      u64 e = 0;
+      if (table[i].key.compare_exchange_strong(e, key)) { used.fetch_add(1, memory_order_relaxed); break; }
+      if (e == key) break;
+    }
+    i = (i + 1) & tableMask;
+    if (probe > 5000) { fprintf(stderr, "hash table full: increase --slots\n"); exit(2); }
+  }
+  table[i].n = (unsigned char)n;
+  return table[i];
+}
+
+static inline void regretMatch(const Slot& nd, float* st) {
   float tot = 0;
   for (int i = 0; i < nd.n; i++) tot += max(0.f, nd.reg[i]);
   for (int i = 0; i < nd.n; i++) st[i] = tot > 0 ? max(0.f, nd.reg[i]) / tot : 1.f / nd.n;
 }
 
-struct Ctx { Deal d; int bk[2][4]; };
+struct Ctx { Deal d; int bk[2][4]; float w; };
 
 static double trav(const St& s, int tr, Ctx& c, Rng& rng) {
   if (s.fold || s.showdown) return util(s, tr, c.d);
@@ -252,61 +289,118 @@ static double trav(const St& s, int tr, Ctx& c, Rng& rng) {
   int n = legal(s, acts);
   int& b = c.bk[p][s.street];
   if (b < 0) b = bucketOf(c.d, p, s.street);
-  Node& nd = nodes[infoKey(s, p, b)];
-  if (nd.n == 0) { nd.n = (unsigned char)n; }
+  Slot& nd = slotFor(infoKey(s, p, b), n);
   float st[MAXA];
   regretMatch(nd, st);
   if (p == tr) {
     double v[MAXA], ev = 0;
     for (int i = 0; i < n; i++) { v[i] = trav(step(s, acts[i]), tr, c, rng); ev += st[i] * v[i]; }
-    Node& nd2 = nodes[infoKey(s, p, b)];   // (same node; map insertions don't move elements)
-    for (int i = 0; i < n; i++) nd2.reg[i] += (float)(v[i] - ev);
+    for (int i = 0; i < n; i++) nd.reg[i] += (float)(v[i] - ev);
     return ev;
   }
-  for (int i = 0; i < n; i++) nd.sum[i] += st[i];
+  for (int i = 0; i < n; i++) nd.sum[i] += c.w * st[i];   // linear averaging: later rounds weigh more
   double r = rng.uni(), acc = 0;
   int pick = n - 1;
   for (int i = 0; i < n; i++) { acc += st[i]; if (r < acc) { pick = i; break; } }
   return trav(step(s, acts[pick]), tr, c, rng);
 }
 
-// ---------------------------------------------------------------- strategy file
-struct Strat { unordered_map<u64, array<unsigned char, MAXA + 1>> m; };   // [0] = n, then quantised probs
+// ---------------------------------------------------------------- files
+struct Hdr {
+  int magic, kind;            // kind 1 = strategy (play), 2 = checkpoint (resume)
+  int start, nbuck, maxr, eqs, nfr;
+  float fr[MAXSIZES];
+  long long iters, count, round;
+};
+static const int MAGIC = 0x48454448;
 
-static bool saveStrategy(const string& path) {
-  FILE* f = fopen(path.c_str(), "wb");
-  if (!f) return false;
-  int hdr[4] = {0x48454447, START, NBUCK, (int)nodes.size()};
-  fwrite(hdr, sizeof(int), 4, f);
-  size_t kept = 0;
-  vector<char> buf;
-  for (auto& kv : nodes) {
-    const Node& nd = kv.second;
+static Hdr makeHdr(int kind, long long iters, long long count, long long round) {
+  Hdr h{};
+  h.magic = MAGIC; h.kind = kind; h.start = START; h.nbuck = NBUCK; h.maxr = MAXR; h.eqs = EQSAMPLES;
+  h.nfr = (int)FRACS.size();
+  for (int i = 0; i < h.nfr; i++) h.fr[i] = (float)FRACS[i];
+  h.iters = iters; h.count = count; h.round = round;
+  return h;
+}
+static void applyHdr(const Hdr& h) {
+  START = h.start; NBUCK = h.nbuck; MAXR = h.maxr; EQSAMPLES = h.eqs;
+  FRACS.assign(h.fr, h.fr + h.nfr);
+}
+
+static bool saveFiles(const string& strategyPath, long long iters, long long round) {
+  string tmp = strategyPath + ".tmp";
+  FILE* f = fopen(tmp.c_str(), "wb");
+  string ckptPath = strategyPath + ".ckpt", ctmp = ckptPath + ".tmp";
+  FILE* g = fopen(ctmp.c_str(), "wb");
+  if (!f || !g) return false;
+  Hdr h = makeHdr(1, iters, 0, round), hc = makeHdr(2, iters, 0, round);
+  fwrite(&h, sizeof h, 1, f);
+  fwrite(&hc, sizeof hc, 1, g);
+  long long kept = 0, ckept = 0;
+  for (size_t i = 0; i < tableSize; i++) {
+    Slot& nd = table[i];
+    u64 key = nd.key.load(memory_order_relaxed);
+    if (!key) continue;
+    fwrite(&key, sizeof key, 1, g);
+    fwrite(&nd.n, 1, 1, g);
+    fwrite(nd.reg, sizeof(float), nd.n, g);
+    fwrite(nd.sum, sizeof(float), nd.n, g);
+    ckept++;
     float tot = 0;
-    for (int i = 0; i < nd.n; i++) tot += nd.sum[i];
+    for (int k = 0; k < nd.n; k++) tot += nd.sum[k];
     if (tot <= 0) continue;
-    fwrite(&kv.first, sizeof(u64), 1, f);
+    fwrite(&key, sizeof key, 1, f);
     unsigned char row[MAXA + 1];
     row[0] = nd.n;
-    for (int i = 0; i < nd.n; i++) row[1 + i] = (unsigned char)lround(255.0 * nd.sum[i] / tot);
+    for (int k = 0; k < nd.n; k++) row[1 + k] = (unsigned char)lround(255.0 * nd.sum[k] / tot);
     fwrite(row, 1, 1 + nd.n, f);
     kept++;
   }
-  fseek(f, 3 * sizeof(int), SEEK_SET);
-  int k = (int)kept;
-  fwrite(&k, sizeof(int), 1, f);
+  h.count = kept; hc.count = ckept;
+  fseek(f, 0, SEEK_SET); fwrite(&h, sizeof h, 1, f);
+  fseek(g, 0, SEEK_SET); fwrite(&hc, sizeof hc, 1, g);
+  fclose(f); fclose(g);
+  rename(tmp.c_str(), strategyPath.c_str());
+  rename(ctmp.c_str(), ckptPath.c_str());
+  return true;
+}
+
+static bool loadCheckpoint(const string& path, long long& iters, long long& round) {
+  FILE* f = fopen(path.c_str(), "rb");
+  if (!f) return false;
+  Hdr h;
+  if (fread(&h, sizeof h, 1, f) != 1 || h.magic != MAGIC || h.kind != 2) { fclose(f); return false; }
+  applyHdr(h);
+  iters = h.iters; round = h.round;
+  fclose(f);
+  return true;   // the caller allocates the table, then calls readCheckpointBody()
+}
+
+static bool readCheckpointBody(const string& path) {
+  FILE* f = fopen(path.c_str(), "rb");
+  if (!f) return false;
+  Hdr h;
+  if (fread(&h, sizeof h, 1, f) != 1) { fclose(f); return false; }
+  for (long long i = 0; i < h.count; i++) {
+    u64 key; unsigned char n;
+    if (fread(&key, sizeof key, 1, f) != 1 || fread(&n, 1, 1, f) != 1) break;
+    Slot& nd = slotFor(key, n);
+    if (fread(nd.reg, sizeof(float), n, f) != n || fread(nd.sum, sizeof(float), n, f) != n) break;
+  }
   fclose(f);
   return true;
 }
 
+struct Strat { unordered_map<u64, array<unsigned char, MAXA + 1>> m; };   // [0] = n, then quantised probs
+
 static bool loadStrategy(const string& path, Strat& S) {
   FILE* f = fopen(path.c_str(), "rb");
   if (!f) return false;
-  int hdr[4];
-  if (fread(hdr, sizeof(int), 4, f) != 4 || hdr[0] != 0x48454447) { fclose(f); return false; }
-  START = hdr[1]; NBUCK = hdr[2];
-  S.m.reserve(hdr[3]);
-  for (int i = 0; i < hdr[3]; i++) {
+  Hdr h;
+  if (fread(&h, sizeof h, 1, f) != 1 || h.magic != MAGIC || h.kind != 1) { fclose(f); return false; }
+  applyHdr(h);
+  S.m.reserve(h.count);
+  for (long long i = 0; i < h.count; i++) {
     u64 key;
     unsigned char n;
     if (fread(&key, sizeof key, 1, f) != 1 || fread(&n, 1, 1, f) != 1) break;
@@ -344,25 +438,65 @@ static string actStr(const St& s, Act a) {
   return string(s.bet[o] > 0 ? "raise to " : "bet ") + to_string(a.to) + (allin ? " (all-in)" : "");
 }
 
-static int cmdTrain(long long iters, const string& out) {
-  Rng rng(0xC0FFEEULL);
+static atomic<bool> g_stop{false};
+static void onSigint(int) { g_stop = true; }
+
+struct TrainOpts {
+  long long iters = 1000000;
+  int threads = 1, logSlots = 24;
+  long long roundIters = 1000000;
+  string out = "strategy.bin", resume;
+};
+
+static int cmdTrain(const TrainOpts& o) {
+  long long done = 0, round = 0;
+  if (!o.resume.empty()) {
+    if (!loadCheckpoint(o.resume, done, round)) { fprintf(stderr, "cannot read checkpoint %s\n", o.resume.c_str()); return 1; }
+    allocTable(o.logSlots);
+    readCheckpointBody(o.resume);
+    printf("resumed: %lld iterations, %zu infosets\n", done, used.load());
+  } else {
+    allocTable(o.logSlots);
+  }
+  signal(SIGINT, onSigint);
+  printf("stack %d bb, %d buckets, sizes", START / BB, NBUCK);
+  for (double f : FRACS) printf(" %.2f", f);
+  printf(", max %d raises, %d threads, table %.1f GB\n", MAXR, o.threads, tableSize * sizeof(Slot) / 1e9);
   auto t0 = chrono::steady_clock::now();
-  for (long long it = 1; it <= iters; it++) {
-    Ctx c;
-    dealRandom(c.d, rng);
-    for (int tr = 0; tr < 2; tr++) {
-      memset(c.bk, -1, sizeof c.bk);
-      trav(newHand(), tr, c, rng);
-    }
-    if (it % 200000 == 0 || it == iters) {
-      double sec = chrono::duration<double>(chrono::steady_clock::now() - t0).count();
-      printf("iter %lld  infosets %zu  %.0f it/s  %.0fs\n", it, nodes.size(), it / sec, sec);
-      fflush(stdout);
-      if (it % 2000000 == 0 || it == iters) saveStrategy(out);
+  auto lastSave = t0;
+  long long start = done;
+  while (done < o.iters && !g_stop) {
+    round++;
+    long long per = max(1LL, o.roundIters / o.threads);
+    vector<thread> th;
+    for (int t = 0; t < o.threads; t++)
+      th.emplace_back([&, t]() {
+        Rng rng(mix((u64)round * 1000003ULL + t + 17));
+        Ctx c;
+        c.w = (float)round;
+        for (long long i = 0; i < per; i++) {
+          dealRandom(c.d, rng);
+          for (int tr = 0; tr < 2; tr++) {
+            memset(c.bk, -1, sizeof c.bk);
+            trav(newHand(), tr, c, rng);
+          }
+        }
+      });
+    for (auto& x : th) x.join();
+    done += per * o.threads;
+    double sec = chrono::duration<double>(chrono::steady_clock::now() - t0).count();
+    printf("round %lld  iter %lld  infosets %zu (%.0f%% of table)  %.0f it/s  %.0fs\n", round, done, used.load(),
+           100.0 * used.load() / tableSize, (done - start) / sec, sec);
+    fflush(stdout);
+    if (used.load() > tableSize * 0.85) { printf("table is 85%% full, stopping (use a larger --slots next time)\n"); break; }
+    if (chrono::duration<double>(chrono::steady_clock::now() - lastSave).count() > 600) {
+      saveFiles(o.out, done, round);
+      lastSave = chrono::steady_clock::now();
+      printf("checkpoint saved\n");
     }
   }
-  saveStrategy(out);
-  printf("saved %s\n", out.c_str());
+  saveFiles(o.out, done, round);
+  printf("saved %s (+ %s.ckpt for resuming)\n", o.out.c_str(), o.out.c_str());
   return 0;
 }
 
@@ -532,9 +666,25 @@ int main(int argc, char** argv) {
   };
   if (cmd == "test") return cmdTest();
   if (cmd == "train") {
-    START = BB * atoi(arg("--stack", "20").c_str());
-    NBUCK = atoi(arg("--buckets", "24").c_str());
-    return cmdTrain(atoll(arg("--iters", "1000000").c_str()), arg("--out", "strategy.bin"));
+    TrainOpts o;
+    o.iters = atoll(arg("--iters", "1000000").c_str());
+    o.threads = atoi(arg("--threads", "1").c_str());
+    o.logSlots = atoi(arg("--slots", "24").c_str());
+    o.roundIters = atoll(arg("--round", "1000000").c_str());
+    o.out = arg("--out", "strategy.bin");
+    o.resume = arg("--resume", "");
+    if (o.resume.empty()) {
+      START = BB * atoi(arg("--stack", "20").c_str());
+      NBUCK = atoi(arg("--buckets", "24").c_str());
+      MAXR = atoi(arg("--maxraises", "3").c_str());
+      EQSAMPLES = atoi(arg("--eqsamples", "100").c_str());
+      string sz = arg("--sizes", "0.5,1.0");
+      FRACS.clear();
+      stringstream ss(sz);
+      string tok;
+      while (getline(ss, tok, ',') && FRACS.size() < (size_t)MAXSIZES) FRACS.push_back(atof(tok.c_str()));
+    }
+    return cmdTrain(o);
   }
   if (cmd == "play" && argc >= 3) return cmdPlay(argv[2]);
   if (cmd == "eval" && argc >= 3) return cmdEval(argv[2], atoll(arg("--hands", "50000").c_str()));
