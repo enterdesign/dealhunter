@@ -1,29 +1,29 @@
-# DealHunter (tier 1 – bez AI w backendzie)
+# DealHunter
 
-Strona + backend (FastAPI + Playwright). Użytkownik podaje EAN/link, miejsce dostawy i listę
-kandydatów (sklep, link, kody). Backend sam wrzuca produkt do koszyka, wpisuje adres, testuje
-kody, odczytuje cenę i układa ranking (z dostawą / bez).
+Podaj EAN/link, miejsce dostawy i listę ofert (sklep, link, kody). Serwer sprawdza koszyki, testuje
+kody, odczytuje cenę z dostawą i układa ranking. Żadnych kosztów API AI – listę kandydatów możesz
+wygenerować w darmowym czacie (przycisk „Kopiuj prompt dla czatu AI”).
 
-Listę kandydatów możesz wygenerować w darmowym czacie AI (przycisk „Kopiuj prompt dla czatu AI”)
-– backend nie wywołuje żadnego API AI, więc nie ma kosztów tokenów.
+## `web/` – wersja PHP (lekka, główna)
+Działa na zwykłym hostingu PHP 8.1+ z cURL. Bez Composera, bazy, crona i przeglądarki: strona
+odpytuje `api.php` po jednej ofercie naraz, więc nie ma długich zadań w tle.
 
-## Uruchomienie
+- **Shopify** (`/products/...`): `.js`, `/cart/add.js`, `/cart.js`, `/cart/shipping_rates.json`, `/discount/KOD`.
+- **WooCommerce** (`/product/...`): Store API (koszyk, adres, wybór dostawy, kupony).
+- Inne sklepy: tylko cena z JSON-LD („niezweryfikowane”).
+
+Uruchomienie lokalnie:
 ```
-python -m venv .venv && . .venv/bin/activate
-pip install -r requirements.txt && playwright install chromium
-uvicorn app.main:app --reload     # http://127.0.0.1:8000
+DEALHUNTER_ALLOW_LOCAL=1 php -S 127.0.0.1:8000 -t web      # LOCAL=1 pozwala testować atrapy na localhost
+php web/tests/run.php                                      # testy (22 asercje)
 ```
-`CHROMIUM_PATH=/ścieżka/do/chrome` pozwala użyć już zainstalowanej przeglądarki.
-Przycisk „Wstaw przykład” używa wbudowanego sklepu demo (`/demo-shop`).
+Wdrożenie: wgraj zawartość `web/` na hosting. Bez `DEALHUNTER_ALLOW_LOCAL` serwer blokuje adresy
+prywatne (SSRF) i limituje 60 sprawdzeń / 10 min na IP. „Wstaw przykład” używa atrap w `web/mock/`.
 
-## Dodawanie sklepu
-Wpis w `app/shops.json` (selektory: add_to_cart, postcode, kod rabatowy, sumy). Sklep bez wpisu
-dostaje tylko cenę z JSON-LD i status „niezweryfikowane”. Sklepy z mocną ochroną antybotową mogą
-wymagać osobnego adaptera/proxy. Sprawdź regulamin sklepu przed automatyzacją.
+**Uwaga:** adaptery zbudowano według dokumentacji API platform i sprawdzono na atrapach – nie na
+prawdziwych sklepach. Kody w Shopify często potwierdzają się dopiero w checkoutcie (wtedy status
+„niepotwierdzony”), a stawki dostawy (`shipping_rates.json`) bywają wyłączone.
 
-## Testy
-`CHROMIUM_PATH=... pytest -q`
-
-## Ograniczenia
-Zadania są trzymane w pamięci (restart = utrata), max 15 kandydatów na zadanie, 3 równoległe koszyki.
-Linki do adresów prywatnych są blokowane (ochrona SSRF).
+## `python/` – wersja z przeglądarką (Playwright)
+Obsługuje dowolny sklep po dopisaniu selektorów w `app/shops.json`, ale wymaga serwera z Chromium.
+`cd python && pip install -r requirements.txt && uvicorn app.main:app` (testy: `pytest`).
