@@ -327,6 +327,14 @@ static void applyHdr(const Hdr& h) {
   FRACS.assign(h.fr, h.fr + h.nfr);
 }
 
+// rename() refuses to overwrite an existing file on Windows
+static void replaceFile(const string& from, const string& to) {
+#ifdef _WIN32
+  remove(to.c_str());
+#endif
+  rename(from.c_str(), to.c_str());
+}
+
 static bool saveFiles(const string& strategyPath, long long iters, long long round) {
   string tmp = strategyPath + ".tmp";
   FILE* f = fopen(tmp.c_str(), "wb");
@@ -360,8 +368,8 @@ static bool saveFiles(const string& strategyPath, long long iters, long long rou
   fseek(f, 0, SEEK_SET); fwrite(&h, sizeof h, 1, f);
   fseek(g, 0, SEEK_SET); fwrite(&hc, sizeof hc, 1, g);
   fclose(f); fclose(g);
-  rename(tmp.c_str(), strategyPath.c_str());
-  rename(ctmp.c_str(), ckptPath.c_str());
+  replaceFile(tmp, strategyPath);
+  replaceFile(ctmp, ckptPath);
   return true;
 }
 

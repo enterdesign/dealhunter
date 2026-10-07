@@ -1,0 +1,19 @@
+POKERAI - szybki start (Windows)
+================================
+
+1) Zagraj od razu (bez Pythona):
+   dwuklik na  PLAY_20bb.bat
+   Wpisz numer akcji i Enter. "q" konczy gre.
+
+2) Trenowanie z okienkiem:
+   - zainstaluj Python 3 z python.org (zaznacz "Add Python to PATH"),
+   - dwuklik na  START_GUI.bat
+   - wybierz Preset, kliknij "Start new training".
+   Dla Twojego 7800X3D / 64 GB: preset "Deep (100 bb, overnight)", CPU threads = 14.
+   "Stop and save" zatrzymuje z zapisem, "Resume" wznawia, "Evaluate" testuje,
+   "Play" uruchamia gre z botem. Pliki wynikowe: folder strategies\ (moga miec GB).
+
+3) Windows moze ostrzegac przy holdem.exe (nieznany program). Plik jest zbudowany
+   z kodu holdem\holdem.cpp, ktory masz w tym folderze.
+
+Szczegoly: README.md
