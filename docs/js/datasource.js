@@ -47,6 +47,7 @@ export function makeContext(model, catalog = {}) {
   const items = catalog.items ?? {};
   return {
     ahPrice(id, mode) {
+      if (items[id]?.bop) return null; // przedmiotów BoP nie da się sprzedać na AH
       const h = model.items.get(id);
       const last = h?.[h.length - 1];
       return last?.[mode] ?? null;
