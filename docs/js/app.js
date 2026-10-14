@@ -1,10 +1,10 @@
-import { loadSavedVariables, makeContext, makeDisenchant, selectHouse } from "./datasource.js?v=44b95249";
-import { kvSet, kvGet, kvDelete } from "./store.js?v=44b95249";
-import { trend, formatMoney, formatPct, netProceeds } from "./engine.js?v=44b95249";
+import { loadSavedVariables, makeContext, makeDisenchant, selectHouse } from "./datasource.js?v=65080894";
+import { kvSet, kvGet, kvDelete } from "./store.js?v=65080894";
+import { trend, formatMoney, formatPct, netProceeds } from "./engine.js?v=65080894";
 import {
   professionIndex, vendorFlips, craftFlips, disenchantFlips, ahFlips, resolveWatchlist, guideInvestments,
   filterRows, sortRows, runCheck, onlyProfitable, filterReliable, NO_PROFESSION,
-} from "./opportunities.js?v=44b95249";
+} from "./opportunities.js?v=65080894";
 
 const $ = (id) => document.getElementById(id);
 const MODE = document.body.dataset.mode || "tbc";
@@ -74,6 +74,8 @@ function el(tag, props = {}, ...children) {
 }
 function td(text, cls) { return el("td", { textContent: text, className: cls ?? "" }); }
 
+const profitCell = (r) => td(money(r.profit), "num " + (r.profit >= 0 ? "good" : "bad"));
+
 function trendCell(t) {
   if (!t) return td("-", "dim");
   const cls = t.dir === "up" ? "good" : t.dir === "down" ? "bad" : "dim";
@@ -109,7 +111,7 @@ const COLUMNS = {
     { label: "Przedmiot", cell: (r) => td(r.name) },
     { label: "Koszt (AH)", key: "cost", cell: (r) => td(money(r.cost), "num") },
     { label: "Vendor", cell: (r) => td(money(r.value), "num") },
-    { label: "Zysk", key: "profit", cell: (r) => td(money(r.profit), "num good") },
+    { label: "Zysk", key: "profit", cell: profitCell },
     { label: "ROI", key: "roi", cell: (r) => td(formatPct(r.roi), "num") },
     { label: "Na AH", cell: (r) => td(String(r.qty ?? "-"), "num") },
     { label: "Profesje", cell: (r) => td(r.professions.join(", "), "dim") },
@@ -119,7 +121,7 @@ const COLUMNS = {
     { label: "Typ", cell: (r) => td(KIND_LABEL[r.kind], "dim") },
     { label: "Koszt", key: "cost", cell: (r) => td(money(r.cost), "num") },
     { label: "Wartość", cell: (r) => td(money(r.value), "num") },
-    { label: "Zysk", key: "profit", cell: (r) => td(money(r.profit), "num " + (r.profit >= 0 ? "good" : "bad")) },
+    { label: "Zysk", key: "profit", cell: profitCell },
     { label: "ROI", key: "roi", cell: (r) => td(formatPct(r.roi), "num") },
     { label: "Jak", cell: (r) => td(r.kind === "craft" ? (USE_LABEL[r.use] ?? "") : "rozbiór") },
     { label: "Na AH", cell: (r) => td(r.qty == null ? "-" : String(r.qty), "num dim") },
@@ -131,7 +133,7 @@ const COLUMNS = {
     { label: "Przedmiot", cell: (r) => td(r.name) },
     { label: "Koszt (najniższa)", key: "cost", cell: (r) => td(money(r.cost), "num") },
     { label: "Typowa cena", cell: (r) => td(money(r.value), "num") },
-    { label: "Zysk", key: "profit", cell: (r) => td(money(r.profit), "num good") },
+    { label: "Zysk", key: "profit", cell: profitCell },
     { label: "ROI", key: "roi", cell: (r) => td(formatPct(r.roi), "num") },
     { label: "Trend 7d", cell: (r) => trendCell(r.trend) },
     { label: "Na AH", cell: (r) => td(String(r.qty ?? "-"), "num") },
@@ -141,7 +143,7 @@ const COLUMNS = {
     { label: "Przedmiot", cell: (r) => td(r.name) },
     { label: "Koszt (najniższa)", key: "cost", cell: (r) => td(money(r.cost), "num") },
     { label: "Typowa cena", cell: (r) => td(money(r.value), "num") },
-    { label: "Potencjał", key: "profit", cell: (r) => td(money(r.profit), "num " + (r.profit >= 0 ? "good" : "bad")) },
+    { label: "Potencjał", key: "profit", cell: profitCell },
     { label: "ROI", key: "roi", cell: (r) => td(formatPct(r.roi), "num") },
     { label: "Trend 7d", cell: (r) => trendCell(r.trend) },
     { label: "Wartość wg guida", cell: (r) => td(r.guideValue ?? "", "dim") },
