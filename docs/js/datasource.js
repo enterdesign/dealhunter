@@ -1,6 +1,6 @@
-import { parseSavedVariables } from "./luaparse.js?v=0361f679";
-import { decodeCbor } from "./cbor.js?v=0361f679";
-import { pricePoint } from "./engine.js?v=0361f679";
+import { parseSavedVariables } from "./luaparse.js?v=fc4af501";
+import { decodeCbor } from "./cbor.js?v=fc4af501";
+import { pricePoint } from "./engine.js?v=fc4af501";
 
 // Zamienia zawartość pliku SavedVariables na model danych strony:
 // { source, items: Map(id -> history[]), known: Set(recipeId), scannedAt (sekundy) }

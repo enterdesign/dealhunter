@@ -1,10 +1,10 @@
-import { loadSavedVariables, makeContext, makeDisenchant, selectHouse } from "./datasource.js?v=0361f679";
-import { kvSet, kvGet, kvDelete } from "./store.js?v=0361f679";
-import { trend, formatMoney, formatPct, netProceeds } from "./engine.js?v=0361f679";
+import { loadSavedVariables, makeContext, makeDisenchant, selectHouse } from "./datasource.js?v=fc4af501";
+import { kvSet, kvGet, kvDelete } from "./store.js?v=fc4af501";
+import { trend, formatMoney, formatPct, netProceeds } from "./engine.js?v=fc4af501";
 import {
   professionIndex, vendorFlips, craftFlips, disenchantFlips, ahFlips, resolveWatchlist, guideInvestments,
   filterRows, sortRows, runCheck, onlyProfitable, filterReliable, NO_PROFESSION,
-} from "./opportunities.js?v=0361f679";
+} from "./opportunities.js?v=fc4af501";
 
 const $ = (id) => document.getElementById(id);
 const MODE = document.body.dataset.mode || "tbc";
@@ -130,7 +130,8 @@ const COLUMNS = {
     { label: "Profesje", cell: (r) => td(r.professions.join(", "), "dim") },
   ],
   craft: [
-    { label: "Wyrób (X)", cell: (r) => td(r.name + (r.known ? "" : "  [?]") + (r.complete ? "" : "  *")) },
+    { label: "Wyrób (X)", cell: (r) => el("td", { className: "name" }, r.name + (r.known ? "" : "  [?]") + (r.complete ? "" : "  *"),
+        el("div", { className: "dim small", textContent: `${r.professions.join(", ")} · ofert wyrobu na AH: ${r.qty ?? "-"}` })) },
     { label: "Składniki (Y, Z)", cell: (r) => el("td", { className: "wrap dim", textContent: ingredientsText(r) }) },
     { label: "Koszt składników", key: "cost", cell: (r) => td(money(r.cost), "num") },
     { label: "Cena X na AH → zysk/strata", key: "profitAh", cell: (r) => optionCell(r, "ah", r.profitAh) },
@@ -139,9 +140,6 @@ const COLUMNS = {
     { label: "Najlepsza opcja", cell: (r) => td(USE_LABEL[r.use] ?? "") },
     { label: "Zysk (najlepsza)", key: "profit", cell: profitCell },
     { label: "ROI", key: "roi", cell: (r) => td(formatPct(r.roi), "num") },
-    { label: "Na AH", cell: (r) => td(r.qty == null ? "-" : String(r.qty), "num dim") },
-    { label: "Rozrzut", cell: (r) => td(r.sd != null ? `± ${money(r.sd)}` : "-", "num dim") },
-    { label: "Profesja", cell: (r) => td(r.professions.join(", "), "dim") },
   ],
   disenchant: [
     { label: "Przedmiot", cell: (r) => td(r.name + (r.complete ? "" : "  *")) },
@@ -171,7 +169,7 @@ const COLUMNS = {
     { label: "ROI", key: "roi", cell: (r) => td(formatPct(r.roi), "num") },
     { label: "Trend 7d", cell: (r) => trendCell(r.trend) },
     { label: "Wartość wg guida", cell: (r) => td(r.guideValue ?? "", "dim") },
-    { label: "Strategia", cell: (r) => td(r.strategy ?? "", "dim") },
+    { label: "Strategia", cell: (r) => el("td", { className: "wrap dim", textContent: r.strategy ?? "" }) },
   ],
 };
 
@@ -188,6 +186,7 @@ function dealDetail(r) {
     if (x.missing.length) parts.push(`Brak ceny: ${x.missing.map(itemName).join(", ")}`);
     const v = x.valueInfo;
     if (v) parts.push(`Kupiec: ${money(v.vendor)} | AH: ${money(v.ah)} | Rozbiór: ${money(v.disenchant)}${v.deIncomplete ? " *" : ""}`);
+    if (v?.deStats) parts.push(`Rozrzut EV rozbioru: ± ${money(v.deStats.sd)} (typowy zakres ${money(Math.max(0, v.deStats.ev - v.deStats.sd))} - ${money(v.deStats.ev + v.deStats.sd)})`);
     const t = trend(state.model.items.get(x.recipe.produces) ?? []);
     if (t) parts.push(`Trend wyrobu (7 dni): ${TREND_LABEL[t.dir]} ${formatPct(t.change)}`);
     if (x.recipe.skill) parts.push(`Umiejętność: ${x.recipe.skill}`);
