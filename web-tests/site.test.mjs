@@ -161,6 +161,14 @@ test("loadSavedVariables: znane receptury o kluczach 1..n (parser zwraca tablic�
   assert.deepEqual([...m.known].sort(), [1, 2]);
 });
 
+test("makeContext: przedmiot BoP nie ma ceny AH, katalog daje nazwę i cenę u kupca", () => {
+  const m = loadSavedVariables('DealHunterAHDB = { ["items"] = { [7] = { ["history"] = { { ["t"] = 1, ["low"] = 5 } } } } }');
+  const ctx = makeContext(m, { items: { 7: { name: "X", bop: true, vendorSell: 9 }, 8: { vendorSell: 3 } } });
+  assert.equal(ctx.ahPrice(7, "low"), null);
+  assert.equal(ctx.vendorSell(7), 9);
+  assert.equal(ctx.vendorSell(8), 3);
+});
+
 test("loadSavedVariables: nieznany format i plik Auctionatora dają czytelny błąd", () => {
   assert.match(loadSavedVariables("Foo = {}").error, /Nie rozpoznano/);
   assert.match(loadSavedVariables("AUCTIONATOR_PRICE_DATABASE = {}").error, /Auctionatora/);
