@@ -87,3 +87,5 @@ a.mode:hover { border-color: var(--accent); }
 
 td.wrap { white-space: normal; min-width: 260px; max-width: 420px; font-size: .82rem; }
 td.best { color: var(--text); font-weight: 600; }
+
+td.opt div.small { font-size: .78rem; }

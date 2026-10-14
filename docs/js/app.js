@@ -1,10 +1,10 @@
-import { loadSavedVariables, makeContext, makeDisenchant, selectHouse } from "./datasource.js?v=982697e0";
-import { kvSet, kvGet, kvDelete } from "./store.js?v=982697e0";
-import { trend, formatMoney, formatPct, netProceeds } from "./engine.js?v=982697e0";
+import { loadSavedVariables, makeContext, makeDisenchant, selectHouse } from "./datasource.js?v=0361f679";
+import { kvSet, kvGet, kvDelete } from "./store.js?v=0361f679";
+import { trend, formatMoney, formatPct, netProceeds } from "./engine.js?v=0361f679";
 import {
   professionIndex, vendorFlips, craftFlips, disenchantFlips, ahFlips, resolveWatchlist, guideInvestments,
   filterRows, sortRows, runCheck, onlyProfitable, filterReliable, NO_PROFESSION,
-} from "./opportunities.js?v=982697e0";
+} from "./opportunities.js?v=0361f679";
 
 const $ = (id) => document.getElementById(id);
 const MODE = document.body.dataset.mode || "tbc";
@@ -17,7 +17,7 @@ const DEAL_KINDS = [
   { id: "vendor", label: "Flipy do vendora",
     help: "Kup na AH taniej, niż płaci kupiec, i sprzedaj kupcowi. Pokazujemy wszystkie skanowane przedmioty (zysk może być ujemny)." },
   { id: "craft", label: "Flipy do profesji",
-    help: "Receptura: koszt składników (z AH albo od kupca; składniki sprzedawane przez kupców liczymy po cenie kupca) kontra wyrób na AH, u kupca i jako rozbiór (EV). Zysk = wartość najlepszej opcji − koszt składników. Receptury z bazy gry, także nieznane." },
+    help: "Receptura: koszt składników Y, Z (z AH albo od kupca; składniki sprzedawane przez kupców liczymy po cenie kupca) porównany osobno z: ceną wyrobu X na AH, ceną X u kupca i EV materiałów z rozbioru X. Pod każdą wartością widać zysk albo stratę tej opcji; \"Zysk (najlepsza)\" dotyczy najlepszej z nich. Receptury z bazy gry, także nieznane." },
   { id: "disenchant", label: "Rozbiór",
     help: "Kup przedmiot na AH i go rozbierz: wartość oczekiwana (EV) materiałów z rozbioru, rozrzut i pewność wyniku. Kliknij wiersz, żeby zobaczyć dwa najczęstsze wyniki." },
   { id: "ah", label: "Flipy na AH",
@@ -79,11 +79,15 @@ function ingredientsText(r) {
   return r.ingredients.map((g) =>
     `${g.count}× ${itemName(g.item)}${g.unit == null ? " (brak ceny)" : ` @ ${money(g.unit)} ${g.source}`}`).join("; ");
 }
-// Wartość wyrobu w danej opcji; najlepsza opcja jest wyróżniona.
-function optionCell(r, name) {
-  const v = r.options?.[name];
-  const t = td(v == null ? "-" : money(v), "num" + (r.use === name && v != null ? " best" : " dim"));
-  return t;
+// Komórka opcji: w pierwszej linii cena (AH / kupiec) albo EV materiałów (rozbiór), w drugiej zysk albo strata
+// względem kosztu składników. Najlepsza opcja jest wyróżniona.
+function optionCell(r, name, profit) {
+  const value = r.options?.[name];
+  const cell = el("td", { className: "num opt" + (r.use === name && value != null ? " best" : "") });
+  if (value == null) { cell.className += " dim"; cell.textContent = "-"; return cell; }
+  cell.append(el("div", { textContent: money(value) }),
+    el("div", { className: profit >= 0 ? "good small" : "bad small", textContent: `${profit >= 0 ? "+" : ""}${money(profit)}` }));
+  return cell;
 }
 const profitCell = (r) => td(money(r.profit), "num " + (r.profit >= 0 ? "good" : "bad"));
 
@@ -129,11 +133,11 @@ const COLUMNS = {
     { label: "Wyrób (X)", cell: (r) => td(r.name + (r.known ? "" : "  [?]") + (r.complete ? "" : "  *")) },
     { label: "Składniki (Y, Z)", cell: (r) => el("td", { className: "wrap dim", textContent: ingredientsText(r) }) },
     { label: "Koszt składników", key: "cost", cell: (r) => td(money(r.cost), "num") },
-    { label: "X na AH", cell: (r) => optionCell(r, "ah") },
-    { label: "X u kupca", cell: (r) => optionCell(r, "vendor") },
-    { label: "X rozbiór (EV)", cell: (r) => optionCell(r, "disenchant") },
+    { label: "Cena X na AH → zysk/strata", key: "profitAh", cell: (r) => optionCell(r, "ah", r.profitAh) },
+    { label: "Cena X u kupca → zysk/strata", key: "profitVendor", cell: (r) => optionCell(r, "vendor", r.profitVendor) },
+    { label: "EV materiałów z rozbioru X → zysk/strata", key: "profitDisenchant", cell: (r) => optionCell(r, "disenchant", r.profitDisenchant) },
     { label: "Najlepsza opcja", cell: (r) => td(USE_LABEL[r.use] ?? "") },
-    { label: "Zysk", key: "profit", cell: profitCell },
+    { label: "Zysk (najlepsza)", key: "profit", cell: profitCell },
     { label: "ROI", key: "roi", cell: (r) => td(formatPct(r.roi), "num") },
     { label: "Na AH", cell: (r) => td(r.qty == null ? "-" : String(r.qty), "num dim") },
     { label: "Rozrzut", cell: (r) => td(r.sd != null ? `± ${money(r.sd)}` : "-", "num dim") },
