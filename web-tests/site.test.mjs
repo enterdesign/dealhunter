@@ -417,3 +417,16 @@ test("filterReliable: cienki rynek i podejrzane ROI, rozbiór i vendor nietknię
   assert.deepEqual(r.rows.map((x) => x.kind), ["craft", "craft", "disenchant", "vendor"]);
   assert.equal(filterReliable(rows, { minQty: 0, maxRoi: 0 }).hidden, 0);
 });
+
+test("skan testowy z repo (okrojony Auctionator.lua) wczytuje się i nie zawiera danych prywatnych", async () => {
+  const fs = await import("node:fs");
+  const buf = fs.readFileSync(new URL("../docs/data/tbc/test-scan.lua", import.meta.url));
+  const text = buf.toString("latin1");
+  const m = loadSavedVariables(text);
+  assert.equal(m.error, undefined);
+  assert.equal(m.source, "Auctionator");
+  assert.ok(m.items.size > 1000);
+  assert.ok(m.scannedAt > 1_700_000_000);
+  for (const forbidden of ["POSTING_HISTORY", "SHOPPING_LISTS", "AUCTIONATOR_CONFIG", "RECENT_SEARCHES", "SELLING_GROUPS"])
+    assert.ok(!text.includes(forbidden), forbidden);
+});

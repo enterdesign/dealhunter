@@ -1,10 +1,10 @@
-import { loadSavedVariables, makeContext, makeDisenchant, selectHouse } from "./datasource.js?v=a117321d";
-import { kvSet, kvGet, kvDelete } from "./store.js?v=a117321d";
-import { trend, formatMoney, formatPct, netProceeds } from "./engine.js?v=a117321d";
+import { loadSavedVariables, makeContext, makeDisenchant, selectHouse } from "./datasource.js?v=44b95249";
+import { kvSet, kvGet, kvDelete } from "./store.js?v=44b95249";
+import { trend, formatMoney, formatPct, netProceeds } from "./engine.js?v=44b95249";
 import {
   professionIndex, vendorFlips, craftFlips, disenchantFlips, ahFlips, resolveWatchlist, guideInvestments,
   filterRows, sortRows, runCheck, onlyProfitable, filterReliable, NO_PROFESSION,
-} from "./opportunities.js?v=a117321d";
+} from "./opportunities.js?v=44b95249";
 
 const $ = (id) => document.getElementById(id);
 const MODE = document.body.dataset.mode || "tbc";
@@ -349,6 +349,7 @@ function renderStatus(extra) {
   if (n) {
     const when = state.model.scannedAt ? new Date(state.model.scannedAt * 1000).toLocaleString("pl-PL") : "?";
     add("ok", `Załadowano ${n} przedmiotów${state.model.house ? ` (${state.model.house})` : ""}, ostatni skan: ${when}.`);
+    if (state.model.testData) add("warn", "To są dane testowe z repozytorium, a nie Twój aktualny skan.");
     if (state.model.noMedian) add("dim", "Źródło: Auctionator zapisuje tylko najniższe ceny dzienne i ilość. Mediana i średnia są niedostępne, więc w ich miejsce używana jest najniższa cena.");
   } else add("dim", "Brak danych cenowych - wgraj plik.");
   if (state.saveFailed) add("err", "Nie udało się zapamiętać danych w przeglądarce - po odświeżeniu trzeba będzie wgrać plik ponownie.");
@@ -374,11 +375,24 @@ function switchTab(tab) {
 }
 
 // Plik czytamy jako bajty (bajt -> znak), bo Auctionator zapisuje w nim dane binarne, których UTF-8 by zepsuł.
-async function readBinaryText(file) {
-  const bytes = new Uint8Array(await file.arrayBuffer());
+function binaryString(buffer) {
+  const bytes = new Uint8Array(buffer);
   const parts = [];
   for (let i = 0; i < bytes.length; i += 16384) parts.push(String.fromCharCode(...bytes.subarray(i, i + 16384)));
   return parts.join("");
+}
+const readBinaryText = async (file) => binaryString(await file.arrayBuffer());
+
+// Skan testowy z repozytorium (okrojony Auctionator.lua) - używany, gdy użytkownik nie wgrał własnego pliku.
+async function loadTestScan() {
+  try {
+    const r = await fetch(DATA + "test-scan.lua", { cache: "no-cache" });
+    if (!r.ok) return false;
+    const res = loadSavedVariables(binaryString(await r.arrayBuffer()));
+    if (res.error) return false;
+    state.model = { ...res, testData: true };
+    return true;
+  } catch { return false; }
 }
 
 function renderHouses() {
@@ -434,6 +448,7 @@ function wire() {
 async function init() {
   wire();
   const restored = await restore();
+  const testScan = restored ? false : await loadTestScan();
   renderHouses();
   const [recipes, items, vendors, de, strategies] = await Promise.all([
     loadJson("recipes.json", []), loadJson("items.json", { items: {} }), loadJson("vendors.json", { prices: {} }),
@@ -444,6 +459,8 @@ async function init() {
   state.strategies = strategies.strategies ?? [];
   state.profIdx = professionIndex(recipes);
   renderProfessionSelects();
-  refresh(restored ? { cls: "dim", text: "Przywrócono dane zapisane w tej przeglądarce podczas poprzedniej wizyty." } : undefined);
+  refresh(restored ? { cls: "dim", text: "Przywrócono dane zapisane w tej przeglądarce podczas poprzedniej wizyty." }
+    : testScan ? { cls: "dim", text: "Wczytano skan testowy z repozytorium (okrojony Auctionator.lua). Wgraj własny plik, żeby go zastąpić." }
+    : undefined);
 }
 init();
