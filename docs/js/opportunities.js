@@ -1,7 +1,7 @@
 // Wyszukiwanie okazji na podstawie skanu AH. Wszystkie ceny w miedzi, wszystkie funkcje czyste (testowalne).
 //
 // model: { items: Map(id -> history[]) }   catalog: { items: {id: {name, vendorSell, bop, ...}} }
-import { trend, netProceeds, rankRecipes, disenchantStats, confidenceLabel, pricePoint } from "./engine.js?v=cb1cefb6";
+import { trend, netProceeds, rankRecipes, disenchantStats, confidenceLabel, pricePoint, demandSignal } from "./engine.js?v=af658772";
 
 export const NO_PROFESSION = "__none";
 
@@ -52,6 +52,7 @@ export function craftFlips(recipes, ctx, opts = {}) {
   return rankRecipes(recipes, ctx, opts).map((r) => {
     const qty = r.recipe.qty ?? 1;
     const vi = r.valueInfo ?? {};
+    const demand = demandSignal(ctx.ahHistory?.(r.recipe.produces) ?? []); // trend ceny i ofert gotowego wyrobu
     const times = (x) => (x == null ? null : x * qty);
     const ingredients = r.recipe.reagents.map((g) => {
       const vb = ctx.vendorBuy?.(g.item);
@@ -63,6 +64,7 @@ export function craftFlips(recipes, ctx, opts = {}) {
       kind: "craft", id: r.recipe.id, name: r.recipe.name, cost: r.cost, value: r.value, profit: r.profit,
       use: r.use, known: r.known, complete: r.complete, professions: [r.recipe.profession], result: r,
       qty: ctx.ahQty?.(r.recipe.produces) ?? null, ingredients, bopReagents: r.bop,
+      demand, trendChange: demand.price?.change ?? null,
       options: { ah: times(vi.ah), vendor: times(vi.vendor), disenchant: times(vi.disenchant) },
       // zysk albo strata dla każdej opcji osobno (wartość opcji − koszt składników)
       profitAh: vi.ah == null ? null : times(vi.ah) - r.cost,

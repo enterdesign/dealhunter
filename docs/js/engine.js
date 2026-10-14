@@ -171,3 +171,33 @@ export function confidenceLabel(n) {
   if (n == null) return "nieznana";
   return n >= 500 ? "wysoka" : n >= 100 ? "średnia" : "niska";
 }
+
+// Trend dowolnego pola punktów historii (np. "qty" = liczba ofert na AH): porównuje ostatni punkt ze średnią
+// wcześniejszych punktów z okna `days`. Wymaga co najmniej 3 punktów, inaczej null.
+export function fieldTrend(history, field, { days = 7, flat = 0.1 } = {}) {
+  if (!history?.length) return null;
+  const cutoff = history[history.length - 1].t - days * 86400;
+  const pts = history.filter((h) => h.t >= cutoff && h[field] != null);
+  if (pts.length < 3) return null;
+  const base = pts.slice(0, -1).reduce((s, p) => s + p[field], 0) / (pts.length - 1);
+  if (!base) return null;
+  const change = pts[pts.length - 1][field] / base - 1;
+  return { change, dir: change > flat ? "up" : change < -flat ? "down" : "flat", points: pts.length };
+}
+
+// Czy wyrób jest teraz poszukiwany? Cena rośnie przy malejącej liczbie ofert = popyt rośnie;
+// cena spada przy rosnącej liczbie ofert = popyt spada (nadpodaż). Inne kombinacje: niejednoznaczne.
+export function demandSignal(history, opts = {}) {
+  const price = trend(history ?? [], { days: opts.days ?? 7, flat: opts.flatPrice ?? 0.05 });
+  const qty = fieldTrend(history, "qty", { days: opts.days ?? 7, flat: opts.flatQty ?? 0.1 });
+  if (!price) return { price: null, qty, label: "brak historii (min. 3 skany)", verdict: "unknown", points: history?.length ?? 0 };
+  let verdict = "flat", label = "bez wyraźnej zmiany";
+  const qd = qty?.dir ?? "flat";
+  if (price.dir === "up" && qd !== "up") { verdict = "up"; label = "popyt rośnie"; }
+  else if (price.dir === "down" && qd !== "down") { verdict = "down"; label = "popyt spada"; }
+  else if (price.dir === "up") { verdict = "mixed"; label = "cena rośnie, ale ofert przybywa"; }
+  else if (price.dir === "down") { verdict = "mixed"; label = "cena spada, ale ofert ubywa"; }
+  else if (qd === "down") { verdict = "up"; label = "ofert ubywa (cena stabilna)"; }
+  else if (qd === "up") { verdict = "down"; label = "ofert przybywa (cena stabilna)"; }
+  return { price, qty, label, verdict, points: price.points };
+}

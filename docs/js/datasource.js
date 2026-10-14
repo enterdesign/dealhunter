@@ -1,6 +1,6 @@
-import { parseSavedVariables } from "./luaparse.js?v=cb1cefb6";
-import { decodeCbor } from "./cbor.js?v=cb1cefb6";
-import { pricePoint } from "./engine.js?v=cb1cefb6";
+import { parseSavedVariables } from "./luaparse.js?v=af658772";
+import { decodeCbor } from "./cbor.js?v=af658772";
+import { pricePoint } from "./engine.js?v=af658772";
 
 // Zamienia zawartość pliku SavedVariables na model danych strony:
 // { source, items: Map(id -> history[]), known: Set(recipeId), scannedAt (sekundy) }
@@ -55,6 +55,7 @@ export function makeContext(model, catalog = {}) {
       return pricePoint(h?.[h.length - 1], mode);
     },
     isBop: (id) => !!items[id]?.bop,
+    ahHistory: (id) => model.items.get(id) ?? null,
     ahQty(id) {
       const h = model.items.get(id);
       return h?.[h.length - 1]?.qty ?? null;
