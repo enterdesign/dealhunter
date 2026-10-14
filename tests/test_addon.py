@@ -18,7 +18,15 @@ function GetAuctionItemInfo(kind, i)
   return a.name or "x", nil, a.count, 1, nil, nil, nil, 0, 0, a.buyout, 0, nil, nil, a.owner, nil, nil, a.itemId, true
 end
 _replicate = nil
+_browse = nil
+_tsui = { info = {}, ids = {}, name = nil }
+C_TradeSkillUI = {
+  GetAllRecipeIDs = function() return _tsui.ids end,
+  GetRecipeInfo = function(id) return _tsui.info[id] end,
+  GetBaseProfessionInfo = function() return _tsui.name and { professionName = _tsui.name } or nil end,
+}
 C_AuctionHouse = {
+  GetBrowseResults = function() return _browse or {} end,
   GetNumReplicateItems = function() return _replicate and #_replicate or 0 end,
   GetReplicateItemInfo = function(i)
     local a = _replicate[i + 1]                       -- numeracja od 0
@@ -202,6 +210,56 @@ class ReplicateTests(unittest.TestCase):
         self.assertEqual(len(list(self.lua.eval("DealHunterAHDB.items").keys())), 0)
 
 
+class BrowseTests(unittest.TestCase):
+    """Forever beta: Auctionator w trybie summary; wyniki przeglądania = najniższa cena i ilość na przedmiot."""
+
+    def setUp(self):
+        self.lua, self.ns = load()
+
+    def set_results(self, rows):
+        self.lua.globals()._browse = self.lua.table_from([
+            self.lua.table(itemKey=self.lua.table(itemID=i), minPrice=p, totalQuantity=q) for i, p, q in rows])
+
+    def run_scan(self):
+        self.lua.execute("_timers = {}")
+        for _ in range(14):                       # tyle zdarzeń przychodzi podczas skanu
+            self.ns.Scanner.onListUpdate("browse")
+        self.assertEqual(len(self.lua.eval("_timers")), 1)
+        self.ns.Scanner.process()
+
+    def history(self, item):
+        return self.lua.eval("DealHunterAHDB.items")[item]["history"]
+
+    def test_records_low_and_qty_without_median(self):
+        self.set_results([(100, 1500, 12), (200, 300, 4)])
+        self.run_scan()
+        p = self.history(100)[1]
+        self.assertEqual((p["low"], p["qty"]), (1500, 12))
+        self.assertIsNone(p["median"])
+        self.assertIsNone(p["avg"])
+        self.assertEqual(self.ns.Scanner.events["browse"], 14)
+
+    def test_variants_of_same_item_are_merged(self):
+        self.set_results([(100, 1500, 12), (100, 900, 3), (100, 2000, 1)])
+        self.run_scan()
+        p = self.history(100)[1]
+        self.assertEqual((p["low"], p["qty"]), (900, 16))
+
+    def test_invalid_rows_skipped_and_refresh_ignored(self):
+        self.set_results([(100, 0, 5), (101, 500, 0), (102, 700, 2)])
+        self.run_scan()
+        self.assertEqual(sorted(self.lua.eval("DealHunterAHDB.items").keys()), [102])
+        self.lua.globals()._now = 1700000000 + 30
+        self.run_scan()
+        self.assertEqual(len(list(self.lua.eval("_printed").values())), 1)
+
+    def test_browse_api_missing_is_safe(self):
+        self.lua.execute("C_AuctionHouse.GetBrowseResults = nil")
+        self.ns.Scanner.onListUpdate("browse")
+        self.ns.Scanner.process()
+        self.assertEqual(len(list(self.lua.eval("DealHunterAHDB.items").keys())), 0)
+
+
 class KnownTests(unittest.TestCase):
     def setUp(self):
         self.lua, self.ns = load()
@@ -234,6 +292,20 @@ class KnownTests(unittest.TestCase):
         trade(self.lua, "UNKNOWN", [("easy", "|Henchant:1|h")])
         self.assertEqual(self.ns.Known.scanTradeSkill(), 0)
         self.assertEqual(self.known(), {})
+
+    def test_modern_profession_window_uses_learned_flag(self):
+        self.lua.execute("""
+          _tsui.name = "Blacksmithing"
+          _tsui.ids = { 10, 11, 12 }
+          _tsui.info = { [10] = { learned = true }, [11] = { learned = false }, [12] = { learned = true } }
+        """)
+        added, prof, total = self.ns.Known.scanModern()
+        self.assertEqual((added, prof, total), (2, "Blacksmithing", 2))
+        self.assertEqual(self.known(), {"Blacksmithing": [10, 12]})
+
+    def test_modern_scan_without_api_or_profession(self):
+        self.lua.execute("C_TradeSkillUI = nil")
+        self.assertEqual(self.ns.Known.scanModern(), 0)
 
     def test_craft_window_for_enchanting(self):
         self.lua.globals()._craft = self.lua.table(name="Enchanting", rows=self.lua.table_from([

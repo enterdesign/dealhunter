@@ -499,3 +499,11 @@ test("receptura: trend gotowego wyrobu w wierszu", () => {
   ctx.ahHistory = () => null;
   assert.equal(craftFlips([recipe(1, 99, [[10, 1]])], ctx, {})[0].trendChange, null);
 });
+
+test("DealHunterAH: zapis bez mediany i średniej (podsumowania z Forever beta) oznaczony jako noMedian", () => {
+  const withMedian = loadSavedVariables('DealHunterAHDB = { ["items"] = { ["100"] = { ["history"] = { { ["t"] = 5, ["low"] = 10, ["median"] = 12, ["qty"] = 3 } } } } }');
+  assert.equal(withMedian.noMedian, false);
+  const lowOnly = loadSavedVariables('DealHunterAHDB = { ["items"] = { ["100"] = { ["history"] = { { ["t"] = 5, ["low"] = 10, ["qty"] = 3 } } } } }');
+  assert.equal(lowOnly.noMedian, true);
+  assert.equal(makeContext(lowOnly, { items: {} }).ahPrice(100, "median"), 10);   // mediana = najniższa cena
+});

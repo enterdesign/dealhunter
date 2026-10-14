@@ -41,6 +41,24 @@ function Known.scanTradeSkill()
   return Known.merge(GetTradeSkillLine(), ids)
 end
 
+-- Nowsze klienty (np. WoW Forever beta): okno profesji oparte na C_TradeSkillUI. GetAllRecipeIDs zwraca receptury
+-- otwartej profesji, a pole "learned" mówi, czy postać je zna.
+function Known.scanModern()
+  local t = C_TradeSkillUI
+  if not (t and t.GetAllRecipeIDs and t.GetRecipeInfo) then return 0 end
+  local ids = {}
+  for _, id in ipairs(t.GetAllRecipeIDs() or {}) do
+    local info = t.GetRecipeInfo(id)
+    if info and info.learned then ids[#ids + 1] = id end
+  end
+  local profession
+  if t.GetBaseProfessionInfo then
+    local base = t.GetBaseProfessionInfo()
+    profession = base and base.professionName
+  end
+  return Known.merge(profession, ids)
+end
+
 -- Enchanting w TBC używa osobnego okna "craft".
 function Known.scanCraft()
   if not (GetCraftDisplaySkillLine and GetNumCrafts and GetCraftInfo and GetCraftRecipeLink) then return 0 end
