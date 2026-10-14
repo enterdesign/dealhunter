@@ -41,13 +41,42 @@ local function scanRecipes(kind)
   return ns.Known.scanModern()
 end
 
-local function addButton(parent, name, kind)
-  if not parent or _G[name] then return end
-  local button = CreateFrame("Button", name, parent, "UIPanelButtonTemplate")
-  button:SetSize(130, 22)
-  button:SetText("Zapisz receptury")
-  button:SetPoint("TOPRIGHT", parent, "TOPRIGHT", -70, -14)
-  button:SetScript("OnClick", function() reportKnown(scanRecipes(kind)) end)
+-- Okno profesji różni się między wersjami gry, więc przycisk jest samodzielny (na UIParent, wysoka warstwa)
+-- i przyczepiany pod oknem, które akurat jest otwarte. Awaryjnie zawsze działa /dhah recipes.
+local WINDOWS = { "ProfessionsFrame", "TradeSkillFrame", "CraftFrame" }
+
+local function findWindow(kind)
+  if kind == "craft" then return _G.CraftFrame end
+  for _, name in ipairs(WINDOWS) do
+    local w = _G[name]
+    if w and w.IsShown and w:IsShown() then return w end
+  end
+  return _G.TradeSkillFrame or _G.ProfessionsFrame
+end
+
+local function addButton(kind)
+  local name = "DealHunterAHRecipesButton"
+  local button = _G[name]
+  if not button then
+    button = CreateFrame("Button", name, UIParent, "UIPanelButtonTemplate")
+    button:SetSize(150, 24)
+    button:SetText("Zapisz receptury")
+    button:SetFrameStrata("FULLSCREEN_DIALOG")
+    button:SetScript("OnClick", function() reportKnown(scanRecipes(button.kind)) end)
+  end
+  button.kind = kind
+  local window = findWindow(kind)
+  button:ClearAllPoints()
+  if window then
+    button:SetPoint("TOPLEFT", window, "BOTTOMLEFT", 10, 4)
+    if window.HookScript and not window.dhahHooked then
+      window.dhahHooked = true
+      window:HookScript("OnHide", function() button:Hide() end)
+    end
+  else
+    button:SetPoint("CENTER", UIParent, "CENTER", 0, -300)
+  end
+  button:Show()
 end
 
 frame:SetScript("OnEvent", function(_, event, arg1)
@@ -65,9 +94,10 @@ frame:SetScript("OnEvent", function(_, event, arg1)
   elseif event == "AUCTION_HOUSE_SHOW" then
     ns.ahOpened = (ns.ahOpened or 0) + 1
   elseif event == "TRADE_SKILL_SHOW" then
-    pcall(addButton, _G.TradeSkillFrame or _G.ProfessionsFrame, "DealHunterAHRecipesButton", "tradeskill")
+    pcall(addButton, "tradeskill")
+    if C_Timer and C_Timer.After then C_Timer.After(0.3, function() pcall(addButton, "tradeskill") end) end
   elseif event == "CRAFT_SHOW" then
-    pcall(addButton, _G.CraftFrame, "DealHunterAHCraftButton", "craft")
+    pcall(addButton, "craft")
   end
 end)
 

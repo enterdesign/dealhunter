@@ -1,7 +1,7 @@
 ## Interface: 20506, 16001
 ## Title: DealHunter AH
 ## Notes: Zbiera ceny z aukcji (każdy skan, także z Auctionatora) i znane receptury do pliku dla strony DealHunter AH.
-## Version: 2.3
+## Version: 2.4
 ## SavedVariables: DealHunterAHDB
 
 src\Stats.lua
