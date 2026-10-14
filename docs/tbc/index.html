@@ -21,8 +21,11 @@
     <label class="drop" id="drop">
       <input type="file" id="file" accept=".lua" hidden>
       <strong>Przeciągnij plik SavedVariables tutaj</strong> albo kliknij, żeby wybrać
-      <span class="hint">np. <code>WTF/Account/…/SavedVariables/DealHunterAH.lua</code> (po <code>/reload</code> w grze)</span>
+      <span class="hint"><code>Auctionator.lua</code> albo <code>DealHunterAH.lua</code> z <code>WTF/Account/…/SavedVariables/</code> (po <code>/reload</code> w grze)</span>
     </label>
+    <div class="toolbar" id="houseBar" hidden>
+      <label>Serwer i frakcja <select id="house"></select></label>
+    </div>
     <ul class="status" id="status"></ul>
   </section>
 
@@ -45,6 +48,8 @@
       </span>
       <label id="optKnown"><input type="checkbox" id="knownOnly"> tylko znane</label>
       <label id="optIncomplete"><input type="checkbox" id="hideIncomplete"> ukryj niekompletne</label>
+      <label id="optQty" title="Wyroby sprzedawane na AH, których jest mniej ofert, są pomijane (jedna absurdalna cena zawyża zysk). 0 = pokaż wszystkie.">min. ofert wyrobu na AH <input type="number" id="minQty" min="0" max="999" step="1" value="3"></label>
+      <label id="optRoi" title="Zysk z ceny z AH powyżej tego ROI zwykle oznacza pojedynczą absurdalną ofertę, a nie realny rynek. 0 = pokaż wszystko.">ukryj podejrzane: ROI powyżej <input type="number" id="maxRoi" min="0" max="100000" step="100" value="500"> %</label>
       <label id="optLoss"><input type="checkbox" id="hideLoss"> ukryj stratne</label>
     </div>
     <div class="scroll"><table id="dealTable"><thead></thead><tbody></tbody></table></div>

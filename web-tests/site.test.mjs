@@ -181,7 +181,7 @@ test("loadSavedVariables: nieznany format i plik Auctionatora dają czytelny bł
 
 // ---------- okazje ----------
 import { professionIndex, matchesProfession, vendorFlips, ahFlips, disenchantFlips, craftFlips,
-  resolveWatchlist, guideInvestments, filterRows, sortRows, onlyProfitable, NO_PROFESSION } from "../docs/js/opportunities.js";
+  resolveWatchlist, guideInvestments, filterRows, sortRows, onlyProfitable, filterReliable, NO_PROFESSION } from "../docs/js/opportunities.js";
 
 const mk = (entries) => ({ items: new Map(entries.map(([id, h]) => [id, h])) });
 const H = (prices, extra = {}) => prices.map((p, i) => ({ t: 1_000_000 + i * 86400, low: p, median: p, avg: p, qty: 5, ...extra }));
@@ -317,4 +317,103 @@ test("runCheck: brak skanu = null, z danymi najlepsze receptury", () => {
   const rows = runCheck({ type: "topRecipes", profession: "TestProf" }, withData);
   assert.equal(rows.length, 1); assert.equal(rows[0].profit, 800);
   assert.equal(runCheck({ type: "nieznany" }, withData), null);
+});
+
+// ---------- Auctionator (CBOR) ----------
+import { decodeCbor } from "../docs/js/cbor.js";
+import { auctionatorItems, selectHouse } from "../docs/js/datasource.js";
+
+// pomocniczy koder CBOR (tylko do testów): napis -> bajty jako napis binarny
+function cborHead(major, n) {
+  if (n < 24) return String.fromCharCode((major << 5) | n);
+  if (n < 256) return String.fromCharCode((major << 5) | 24, n);
+  if (n < 65536) return String.fromCharCode((major << 5) | 25, n >> 8, n & 255);
+  return String.fromCharCode((major << 5) | 26, (n >>> 24) & 255, (n >> 16) & 255, (n >> 8) & 255, n & 255);
+}
+function enc(v) {
+  if (typeof v === "number") return cborHead(0, v);
+  if (typeof v === "string") return cborHead(2, v.length) + v;
+  if (Array.isArray(v)) return cborHead(4, v.length) + v.map(enc).join("");
+  return cborHead(5, Object.keys(v).length) + Object.entries(v).map(([k, x]) => enc(k) + enc(x)).join("");
+}
+// zapis jak w SavedVariables: \ " NUL CR LF escapowane, reszta bajtów surowo
+const luaString = (bin) => '"' + [...bin].map((c) => {
+  const code = c.charCodeAt(0);
+  if (c === "\\") return "\\\\";
+  if (c === '"') return '\\"';
+  if (code === 0) return "\\000";
+  if (code === 13) return "\\r";
+  if (code === 10) return "\\n";
+  return c;
+}).join("") + '"';
+
+test("CBOR: liczby, napisy, tablice, mapy (różne długości nagłówków)", () => {
+  const v = { a: [1, 23, 24, 255, 256, 70000], s: "x".repeat(30), m: { k: 5 } };
+  assert.deepEqual(decodeCbor(enc(v)), v);
+  assert.throws(() => decodeCbor(enc(5) + "x"), /nadmiarowych/);
+  assert.throws(() => decodeCbor(cborHead(5, 3)), /koniec danych/);
+});
+
+test("Auctionator: parsowanie bazy cen (dni, m, warianty przyrostków, klucz version)", () => {
+  const house = {
+    version: 2,
+    "100": { a: { "2476": 5, "2478": 7 }, h: { "2476": 1000, "2478": 900 }, l: [], m: 850 },
+    "gr:200:of the Boar": { a: { "2478": 2 }, h: { "2478": 3000 }, l: [], m: 3000 },
+    "gr:200:of the Monkey": { a: { "2478": 1 }, h: { "2478": 2500 }, l: { "2478": 2400 }, m: 2400 },
+    "p:55": { a: { "2478": 1 }, h: { "2478": 10 }, l: [], m: 10 },
+  };
+  const lua = `AUCTIONATOR_SAVEDVARS = {\r\n["TimeOfLastGetAllScan"] = 1791973615,\r\n}\r\n` +
+    `AUCTIONATOR_PRICE_DATABASE = {\r\n["__dbversion"] = 8,\r\n["Testowo Horde"] = ${luaString(enc(house))},\r\n}\r\n`;
+  const m = loadSavedVariables(lua);
+  assert.equal(m.error, undefined);
+  assert.equal(m.source, "Auctionator"); assert.equal(m.house, "Testowo Horde");
+  assert.equal(m.scannedAt, 1791973615);
+  assert.deepEqual([...m.items.keys()].sort((a, b) => a - b), [100, 200]); // pet pominięty, warianty połączone
+  const h100 = m.items.get(100);
+  assert.equal(h100.length, 2);
+  assert.equal(h100[1].low, 850);               // m zastępuje cenę najnowszego dnia
+  assert.equal(h100[1].qty, 7); assert.equal(h100[0].high, 1000);
+  assert.equal(h100[1].t, 1577836800 + 2478 * 86400 + 43200);
+  const h200 = m.items.get(200);
+  assert.equal(h200[0].low, 2400); assert.equal(h200[0].qty, 3); // najtańszy wariant, suma ilości
+  // brak mediany -> pricePoint cofa się do najniższej ceny
+  const ctx = makeContext(m, { items: {} });
+  assert.equal(ctx.ahPrice(100, "median"), 850);
+  assert.equal(ctx.ahQty(100), 7);
+});
+
+test("Auctionator: wiele serwerów i przełączanie, błędy", () => {
+  const a = { "1": { a: { "2478": 1 }, h: { "2478": 5 }, l: [], m: 5 } };
+  const b = { "1": { a: { "2478": 1 }, h: { "2478": 9 }, l: [], m: 9 }, "2": { a: { "2478": 1 }, h: { "2478": 9 }, l: [], m: 9 } };
+  const lua = `AUCTIONATOR_PRICE_DATABASE = {\n["__dbversion"] = 8,\n["A Alliance"] = ${luaString(enc(a))},\n["B Horde"] = ${luaString(enc(b))},\n}\n`;
+  const m = loadSavedVariables(lua);
+  assert.equal(m.house, "B Horde");                 // domyślnie serwer z największą liczbą przedmiotów
+  selectHouse(m, "A Alliance");
+  assert.equal(m.items.get(1)[0].low, 5);
+  assert.match(loadSavedVariables('AUCTIONATOR_PRICE_DATABASE = { ["x"] = "zepsute" }').error, /zdekodować/);
+  assert.match(loadSavedVariables("AUCTIONATOR_CONFIG = {}").error, /bez bazy cen/);
+});
+
+test("trend i flipy działają na danych bez mediany (tylko low)", () => {
+  const h = [100, 100, 100, 150].map((p, i) => ({ t: 1_000_000 + i * 86400, low: p, high: p, qty: 3 }));
+  assert.equal(trend(h).dir, "up");
+  const model = mk([[1, [1000, 1000, 1000, 600].map((p, i) => ({ t: 1_000_000 + i * 86400, low: p, high: p, qty: 3 }))]]);
+  const rows = ahFlips(model, cat({ 1: { name: "A" } }), new Map());
+  assert.equal(rows[0].profit, 400);
+});
+
+test("filterReliable: cienki rynek i podejrzane ROI, rozbiór i vendor nietknięte", () => {
+  const rows = [
+    { kind: "craft", use: "ah", qty: 1, roi: 2 },        // za mało ofert
+    { kind: "craft", use: "ah", qty: 10, roi: 20 },      // ROI 2000%
+    { kind: "craft", use: "ah", qty: 10, roi: 3 },       // OK
+    { kind: "craft", use: "vendor", qty: 0, roi: 50 },   // wartość od kupca - OK
+    { kind: "disenchant", roi: 90 },                     // rozbiór - OK
+    { kind: "ah", roi: 8 },                              // 800% > 500%
+    { kind: "vendor", roi: 70 },
+  ];
+  const r = filterReliable(rows, { minQty: 3, maxRoi: 500 });
+  assert.equal(r.hidden, 3);
+  assert.deepEqual(r.rows.map((x) => x.kind), ["craft", "craft", "disenchant", "vendor"]);
+  assert.equal(filterReliable(rows, { minQty: 0, maxRoi: 0 }).hidden, 0);
 });

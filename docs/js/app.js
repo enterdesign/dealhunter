@@ -1,8 +1,8 @@
-import { loadSavedVariables, makeContext, makeDisenchant } from "./datasource.js";
+import { loadSavedVariables, makeContext, makeDisenchant, selectHouse } from "./datasource.js";
 import { trend, formatMoney, formatPct, netProceeds } from "./engine.js";
 import {
   professionIndex, vendorFlips, craftFlips, disenchantFlips, ahFlips, resolveWatchlist, guideInvestments,
-  filterRows, sortRows, runCheck, onlyProfitable, NO_PROFESSION,
+  filterRows, sortRows, runCheck, onlyProfitable, filterReliable, NO_PROFESSION,
 } from "./opportunities.js";
 
 const $ = (id) => document.getElementById(id);
@@ -41,6 +41,7 @@ function save() {
   try {
     localStorage.setItem(STORE_KEY, JSON.stringify({
       items: Object.fromEntries(state.model.items), known: [...state.model.known], scannedAt: state.model.scannedAt,
+      source: state.model.source, noMedian: !!state.model.noMedian, house: state.model.house,
     }));
   } catch { /* brak miejsca lub zablokowane - strona działa dalej */ }
 }
@@ -50,7 +51,7 @@ function restore() {
     if (!raw) return;
     const d = JSON.parse(raw);
     state.model = {
-      source: "pamięć przeglądarki",
+      source: d.source ?? "pamięć przeglądarki", noMedian: !!d.noMedian, house: d.house,
       items: new Map(Object.entries(d.items).map(([k, v]) => [Number(k), v])),
       known: new Set(d.known), scannedAt: d.scannedAt,
     };
@@ -124,6 +125,7 @@ const COLUMNS = {
     { label: "Zysk", key: "profit", cell: (r) => td(money(r.profit), "num " + (r.profit >= 0 ? "good" : "bad")) },
     { label: "ROI", key: "roi", cell: (r) => td(formatPct(r.roi), "num") },
     { label: "Jak", cell: (r) => td(r.kind === "craft" ? (USE_LABEL[r.use] ?? "") : "rozbiór") },
+    { label: "Na AH", cell: (r) => td(r.qty == null ? "-" : String(r.qty), "num dim") },
     { label: "Rozrzut", cell: (r) => td(r.kind === "disenchant" ? `± ${money(r.sd)}` : "-", "num dim") },
     { label: "Pewność", cell: (r) => td(r.kind === "disenchant" ? r.confidence : "-", "dim") },
     { label: "Profesja", cell: (r) => td(r.professions.join(", "), "dim") },
@@ -220,7 +222,8 @@ function renderDeals() {
   renderKindChips();
   const kind = DEAL_KINDS.find((k) => k.id === state.deal);
   $("dealHelp").textContent = kind.help;
-  $("optKnown").hidden = $("optIncomplete").hidden = state.deal !== "craft";
+  $("optKnown").hidden = $("optIncomplete").hidden = $("optQty").hidden = state.deal !== "craft";
+  $("optRoi").hidden = state.deal === "vendor";
   document.querySelectorAll("#sortbar button").forEach((b) => {
     const active = b.dataset.sort === state.sortBy;
     b.classList.toggle("active", active);
@@ -246,10 +249,13 @@ function renderDeals() {
   if (state.deal === "guide" && !state.watch.length) { empty.textContent = "Brak listy przedmiotów z guidów."; return; }
 
   let rows = filterRows(state.deals[state.deal] ?? [], state.profession);
+  const reliable = filterReliable(rows, { minQty: Number($("minQty").value) || 0, maxRoi: Number($("maxRoi").value) || 0 });
+  rows = reliable.rows;
   if ($("hideLoss").checked) rows = onlyProfitable(rows);
   rows = sortRows(rows, state.sortBy, state.sortDir);
-  empty.textContent = rows.length ? `Pokazano ${Math.min(rows.length, 300)} z ${rows.length}.`
-    : "Brak wyników dla tych filtrów (spróbuj zmienić profesję, dodać skany lub poluzować progi).";
+  const hiddenNote = reliable.hidden ? ` Ukryto ${reliable.hidden} niewiarygodnych (mało ofert albo podejrzanie wysokie ROI).` : "";
+  empty.textContent = rows.length ? `Pokazano ${Math.min(rows.length, 300)} z ${rows.length}.${hiddenNote}`
+    : `Brak wyników dla tych filtrów (spróbuj zmienić profesję, dodać skany lub poluzować progi).${hiddenNote}`;
   for (const r of rows.slice(0, 300)) {
     const tr = el("tr", { className: "row" }, ...cols.map((c) => c.cell(r)));
     let detail = null;
@@ -330,8 +336,9 @@ function renderItems() {
   rows.sort((a, b) => (b.last.qty ?? 0) - (a.last.qty ?? 0));
   empty.textContent = rows.length ? "" : "Brak pasujących przedmiotów.";
   for (const r of rows.slice(0, 500)) {
-    tbody.append(el("tr", {}, td(r.name), td(money(r.last.low), "num"), td(money(r.last.median), "num"),
-      td(money(r.last.avg), "num"), td(String(r.last.qty ?? "-"), "num"), trendCell(r.tr)));
+    const opt = (x) => (x == null ? "-" : money(x));
+    tbody.append(el("tr", {}, td(r.name), td(money(r.last.low), "num"), td(opt(r.last.median), "num"),
+      td(opt(r.last.avg), "num"), td(String(r.last.qty ?? "-"), "num"), trendCell(r.tr)));
   }
 }
 
@@ -344,7 +351,8 @@ function renderStatus(extra) {
   const n = state.model.items.size;
   if (n) {
     const when = state.model.scannedAt ? new Date(state.model.scannedAt * 1000).toLocaleString("pl-PL") : "?";
-    add("ok", `Załadowano ${n} przedmiotów, ostatni skan: ${when}.`);
+    add("ok", `Załadowano ${n} przedmiotów${state.model.house ? ` (${state.model.house})` : ""}, ostatni skan: ${when}.`);
+    if (state.model.noMedian) add("dim", "Źródło: Auctionator zapisuje tylko najniższe ceny dzienne i ilość. Mediana i średnia są niedostępne, więc w ich miejsce używana jest najniższa cena.");
   } else add("dim", "Brak danych cenowych - wgraj plik.");
   const c = state.catalog;
   add("dim", `Baza: ${state.recipes.length} receptur, ${Object.keys(c.items ?? {}).length} przedmiotów, ` +
@@ -367,12 +375,30 @@ function switchTab(tab) {
   renderDeals();
 }
 
+// Plik czytamy jako bajty (bajt -> znak), bo Auctionator zapisuje w nim dane binarne, których UTF-8 by zepsuł.
+async function readBinaryText(file) {
+  const bytes = new Uint8Array(await file.arrayBuffer());
+  const parts = [];
+  for (let i = 0; i < bytes.length; i += 16384) parts.push(String.fromCharCode(...bytes.subarray(i, i + 16384)));
+  return parts.join("");
+}
+
+function renderHouses() {
+  const bar = $("houseBar");
+  const houses = state.model.houses ? Object.keys(state.model.houses) : [];
+  bar.hidden = houses.length < 2;
+  if (bar.hidden) return;
+  $("house").replaceChildren(...houses.map((h) => new Option(`${h} (${state.model.houses[h].size})`, h)));
+  $("house").value = state.model.house;
+}
+
 async function handleFile(file) {
   if (!file) return;
-  const res = loadSavedVariables(await file.text());
+  const res = loadSavedVariables(await readBinaryText(file));
   if (res.error) return refresh({ cls: "err", text: res.error });
   state.model = res;
   save();
+  renderHouses();
   refresh({ cls: "ok", text: `Wczytano plik ${file.name}.` });
 }
 
@@ -383,6 +409,7 @@ function wire() {
   for (const ev of ["dragleave", "drop"]) drop.addEventListener(ev, (e) => { e.preventDefault(); drop.classList.remove("over"); });
   drop.addEventListener("drop", (e) => handleFile(e.dataTransfer.files[0]));
 
+  $("house").addEventListener("change", (e) => { selectHouse(state.model, e.target.value); save(); refresh(); });
   document.querySelectorAll(".tabs button").forEach((b) => b.addEventListener("click", () => switchTab(b.dataset.tab)));
   $("profession").addEventListener("change", (e) => { state.profession = e.target.value; renderDeals(); });
   $("stratProfession").addEventListener("change", (e) => { state.stratProfession = e.target.value; renderStrategies(); });
@@ -390,6 +417,8 @@ function wire() {
   for (const id of ["knownOnly", "hideIncomplete", "sellMode", "buyMode", "feeEnabled", "feeCut"])
     $(id).addEventListener("change", () => refresh());
   $("hideLoss").addEventListener("change", renderDeals);
+  $("minQty").addEventListener("change", renderDeals);
+  $("maxRoi").addEventListener("change", renderDeals);
   $("itemFilter").addEventListener("input", (e) => { state.itemFilter = e.target.value; renderItems(); });
   $("clear").addEventListener("click", () => {
     try { localStorage.removeItem(STORE_KEY); } catch { /* ignoruj */ }
