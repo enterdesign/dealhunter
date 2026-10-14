@@ -1,10 +1,10 @@
-import { loadSavedVariables, makeContext, makeDisenchant, selectHouse } from "./datasource.js?v=65080894";
-import { kvSet, kvGet, kvDelete } from "./store.js?v=65080894";
-import { trend, formatMoney, formatPct, netProceeds } from "./engine.js?v=65080894";
+import { loadSavedVariables, makeContext, makeDisenchant, selectHouse } from "./datasource.js?v=982697e0";
+import { kvSet, kvGet, kvDelete } from "./store.js?v=982697e0";
+import { trend, formatMoney, formatPct, netProceeds } from "./engine.js?v=982697e0";
 import {
   professionIndex, vendorFlips, craftFlips, disenchantFlips, ahFlips, resolveWatchlist, guideInvestments,
   filterRows, sortRows, runCheck, onlyProfitable, filterReliable, NO_PROFESSION,
-} from "./opportunities.js?v=65080894";
+} from "./opportunities.js?v=982697e0";
 
 const $ = (id) => document.getElementById(id);
 const MODE = document.body.dataset.mode || "tbc";
@@ -12,13 +12,14 @@ const DATA = `../data/${MODE}/`;
 const STORE_KEY = `dealhunter-ah.${MODE}.model.v1`;
 const TREND_LABEL = { up: "▲", down: "▼", flat: "▬" };
 const USE_LABEL = { vendor: "kupiec", ah: "AH", disenchant: "rozbiór" };
-const KIND_LABEL = { craft: "receptura", disenchant: "rozbiór" };
 
 const DEAL_KINDS = [
   { id: "vendor", label: "Flipy do vendora",
     help: "Kup na AH taniej, niż płaci kupiec, i sprzedaj kupcowi. Pokazujemy wszystkie skanowane przedmioty (zysk może być ujemny)." },
   { id: "craft", label: "Flipy do profesji",
-    help: "Kup składniki, wytwórz i sprzedaj wyrób albo kup przedmiot i go rozbierz (wartość = oczekiwana z rozbioru, z rozrzutem i pewnością). Składniki od kupców liczymy po cenie kupca. Receptury z bazy gry, także nieznane." },
+    help: "Receptura: koszt składników (z AH albo od kupca; składniki sprzedawane przez kupców liczymy po cenie kupca) kontra wyrób na AH, u kupca i jako rozbiór (EV). Zysk = wartość najlepszej opcji − koszt składników. Receptury z bazy gry, także nieznane." },
+  { id: "disenchant", label: "Rozbiór",
+    help: "Kup przedmiot na AH i go rozbierz: wartość oczekiwana (EV) materiałów z rozbioru, rozrzut i pewność wyniku. Kliknij wiersz, żeby zobaczyć dwa najczęstsze wyniki." },
   { id: "ah", label: "Flipy na AH",
     help: "Aktualna najniższa cena kontra mediana z historii Twoich skanów (potrzebne co najmniej 3 skany). Dodatni zysk = taniej niż zwykle." },
   { id: "guide", label: "Inwestycje z guidów",
@@ -74,6 +75,16 @@ function el(tag, props = {}, ...children) {
 }
 function td(text, cls) { return el("td", { textContent: text, className: cls ?? "" }); }
 
+function ingredientsText(r) {
+  return r.ingredients.map((g) =>
+    `${g.count}× ${itemName(g.item)}${g.unit == null ? " (brak ceny)" : ` @ ${money(g.unit)} ${g.source}`}`).join("; ");
+}
+// Wartość wyrobu w danej opcji; najlepsza opcja jest wyróżniona.
+function optionCell(r, name) {
+  const v = r.options?.[name];
+  const t = td(v == null ? "-" : money(v), "num" + (r.use === name && v != null ? " best" : " dim"));
+  return t;
+}
 const profitCell = (r) => td(money(r.profit), "num " + (r.profit >= 0 ? "good" : "bad"));
 
 function trendCell(t) {
@@ -95,11 +106,9 @@ function computeDeals() {
   state.ctx = ctx;
   state.deals = {
     vendor: vendorFlips(state.model, state.catalog, idx, base),
-    craft: [
-      ...craftFlips(state.recipes, ctx, { ...base, known: state.model.known, knownOnly: $("knownOnly").checked,
-        includeIncomplete: !$("hideIncomplete").checked }),
-      ...disenchantFlips(state.model, state.catalog, ctx, base),
-    ],
+    craft: craftFlips(state.recipes, ctx, { ...base, known: state.model.known, knownOnly: $("knownOnly").checked,
+      includeIncomplete: !$("hideIncomplete").checked }),
+    disenchant: disenchantFlips(state.model, state.catalog, ctx, base),
     ah: ahFlips(state.model, state.catalog, idx, base),
     guide: guideInvestments(state.watch, state.model, state.catalog, base),
   };
@@ -117,17 +126,28 @@ const COLUMNS = {
     { label: "Profesje", cell: (r) => td(r.professions.join(", "), "dim") },
   ],
   craft: [
-    { label: "Wyrób / przedmiot", cell: (r) => td(r.name + (r.kind === "craft" && !r.known ? "  [?]" : "") + (r.complete ? "" : "  *")) },
-    { label: "Typ", cell: (r) => td(KIND_LABEL[r.kind], "dim") },
-    { label: "Koszt", key: "cost", cell: (r) => td(money(r.cost), "num") },
-    { label: "Wartość", cell: (r) => td(money(r.value), "num") },
+    { label: "Wyrób (X)", cell: (r) => td(r.name + (r.known ? "" : "  [?]") + (r.complete ? "" : "  *")) },
+    { label: "Składniki (Y, Z)", cell: (r) => el("td", { className: "wrap dim", textContent: ingredientsText(r) }) },
+    { label: "Koszt składników", key: "cost", cell: (r) => td(money(r.cost), "num") },
+    { label: "X na AH", cell: (r) => optionCell(r, "ah") },
+    { label: "X u kupca", cell: (r) => optionCell(r, "vendor") },
+    { label: "X rozbiór (EV)", cell: (r) => optionCell(r, "disenchant") },
+    { label: "Najlepsza opcja", cell: (r) => td(USE_LABEL[r.use] ?? "") },
     { label: "Zysk", key: "profit", cell: profitCell },
     { label: "ROI", key: "roi", cell: (r) => td(formatPct(r.roi), "num") },
-    { label: "Jak", cell: (r) => td(r.kind === "craft" ? (USE_LABEL[r.use] ?? "") : "rozbiór") },
     { label: "Na AH", cell: (r) => td(r.qty == null ? "-" : String(r.qty), "num dim") },
-    { label: "Rozrzut", cell: (r) => td(r.kind === "disenchant" ? `± ${money(r.sd)}` : "-", "num dim") },
-    { label: "Pewność", cell: (r) => td(r.kind === "disenchant" ? r.confidence : "-", "dim") },
+    { label: "Rozrzut", cell: (r) => td(r.sd != null ? `± ${money(r.sd)}` : "-", "num dim") },
     { label: "Profesja", cell: (r) => td(r.professions.join(", "), "dim") },
+  ],
+  disenchant: [
+    { label: "Przedmiot", cell: (r) => td(r.name + (r.complete ? "" : "  *")) },
+    { label: "Koszt (AH)", key: "cost", cell: (r) => td(money(r.cost), "num") },
+    { label: "Rozbiór (EV)", cell: (r) => td(money(r.value), "num") },
+    { label: "Zysk", key: "profit", cell: profitCell },
+    { label: "ROI", key: "roi", cell: (r) => td(formatPct(r.roi), "num") },
+    { label: "Rozrzut", cell: (r) => td(`± ${money(r.sd)}`, "num dim") },
+    { label: "Pewność", cell: (r) => td(r.confidence, "dim") },
+    { label: "Na AH", cell: (r) => td(r.qty == null ? "-" : String(r.qty), "num dim") },
   ],
   ah: [
     { label: "Przedmiot", cell: (r) => td(r.name) },

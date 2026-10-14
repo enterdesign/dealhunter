@@ -1,7 +1,7 @@
 // Wyszukiwanie okazji na podstawie skanu AH. Wszystkie ceny w miedzi, wszystkie funkcje czyste (testowalne).
 //
 // model: { items: Map(id -> history[]) }   catalog: { items: {id: {name, vendorSell, bop, ...}} }
-import { trend, netProceeds, rankRecipes, disenchantStats, confidenceLabel, pricePoint } from "./engine.js?v=65080894";
+import { trend, netProceeds, rankRecipes, disenchantStats, confidenceLabel, pricePoint } from "./engine.js?v=982697e0";
 
 export const NO_PROFESSION = "__none";
 
@@ -45,13 +45,27 @@ export function vendorFlips(model, catalog, idx, { buyMode = "low" } = {}) {
   return out;
 }
 
-// B1. Receptury: kup składniki, wytwórz, sprzedaj (silnik z engine.js).
-export function craftFlips(recipes, ctx, opts) {
-  return rankRecipes(recipes, ctx, opts).map((r) => row({
-    kind: "craft", id: r.recipe.id, name: r.recipe.name, cost: r.cost, value: r.value, profit: r.profit,
-    use: r.use, known: r.known, complete: r.complete, professions: [r.recipe.profession], result: r,
-    qty: ctx.ahQty?.(r.recipe.produces) ?? null,
-  }));
+// B1. Receptury: składniki Y i Z (cena z AH albo od kupca) kontra wyrób X na AH / u kupca / EV rozbioru.
+// Wiersz zawiera listę składników z cenami i źródłem oraz wartość wyrobu w każdej z trzech opcji.
+export function craftFlips(recipes, ctx, opts = {}) {
+  const buyMode = opts.buyMode ?? "low";
+  return rankRecipes(recipes, ctx, opts).map((r) => {
+    const qty = r.recipe.qty ?? 1;
+    const vi = r.valueInfo ?? {};
+    const times = (x) => (x == null ? null : x * qty);
+    const ingredients = r.recipe.reagents.map((g) => {
+      const vb = ctx.vendorBuy?.(g.item);
+      const unit = vb != null ? vb : ctx.ahPrice(g.item, buyMode);
+      return { item: g.item, count: g.count, unit, source: vb != null ? "kupiec" : unit != null ? "AH" : null };
+    });
+    return row({
+      kind: "craft", id: r.recipe.id, name: r.recipe.name, cost: r.cost, value: r.value, profit: r.profit,
+      use: r.use, known: r.known, complete: r.complete, professions: [r.recipe.profession], result: r,
+      qty: ctx.ahQty?.(r.recipe.produces) ?? null, ingredients,
+      options: { ah: times(vi.ah), vendor: times(vi.vendor), disenchant: times(vi.disenchant) },
+      sd: r.use === "disenchant" && vi.deStats ? vi.deStats.sd * qty : null,
+    });
+  });
 }
 
 // B2. Rozbiór: kup przedmiot na AH, rozbierz, sprzedaj materiały. Pokazujemy każdy skanowany przedmiot,

@@ -84,3 +84,6 @@ a.mode:hover { border-color: var(--accent); }
 
 .errorbar { background: #7f1d1d; color: #fff; padding: 10px 16px; font-size: .9rem; }
 .errorbar code { background: rgba(255,255,255,.15); }
+
+td.wrap { white-space: normal; min-width: 260px; max-width: 420px; font-size: .82rem; }
+td.best { color: var(--text); font-weight: 600; }

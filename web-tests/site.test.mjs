@@ -266,6 +266,18 @@ test("receptury jako okazje: koszt, zysk i profesja", () => {
   assert.equal(rows[0].cost, 200); assert.equal(rows[0].profit, 800); assert.deepEqual(rows[0].professions, ["TestProf"]);
 });
 
+test("receptura: składniki z cenami i źródłem oraz wartość wyrobu w trzech opcjach", () => {
+  // X = 2 szt., składnik 10 z AH (100), składnik 11 od kupca (40; AH tańsze = 5, ale kupiec ma pierwszeństwo)
+  const ctx = ctxOf({ "10:low": 100, "11:low": 5, "99:median": 300, "2:median": 500 },
+    { vendorBuy: { 11: 40 }, vendorSell: { 99: 120 }, de: { 99: [{ item: 2, chance: 0.5, dist: [[1, 1]] }] } });
+  const [r] = craftFlips([recipe(1, 99, [[10, 2], [11, 3]], { qty: 2 })], ctx, {});
+  assert.deepEqual(r.ingredients.map((g) => [g.item, g.count, g.unit, g.source]), [[10, 2, 100, "AH"], [11, 3, 40, "kupiec"]]);
+  assert.equal(r.cost, 2 * 100 + 3 * 40);
+  assert.deepEqual(r.options, { ah: 600, vendor: 240, disenchant: 500 }); // AH 300*2, kupiec 120*2, EV 0.5*500*2
+  assert.equal(r.use, "ah"); assert.equal(r.profit, 600 - 320);
+  assert.equal(r.sd, null); // najlepsza opcja to nie rozbiór
+});
+
 test("inwestycje z guidów: nazwy -> id, cena, dystans do historii", () => {
   const catalog = cat({ 7: { name: "Primal Mana" }, 8: { name: "Primal Mana" }, 9: { name: "Void Crystal" } });
   const model = mk([[8, H([1000, 1000, 1000, 800])]]);
