@@ -11,8 +11,15 @@ end
 local frame = CreateFrame("Frame")
 frame:RegisterEvent("ADDON_LOADED")
 -- Zdarzenia opcjonalne rejestrujemy w pcall: jeśli któregoś klient nie zna, addon i tak się załaduje.
-for _, event in ipairs({ "AUCTION_ITEM_LIST_UPDATE", "TRADE_SKILL_SHOW", "CRAFT_SHOW" }) do
+local EVENTS = { "AUCTION_ITEM_LIST_UPDATE", "REPLICATE_ITEM_LIST_UPDATE", "AUCTION_HOUSE_SHOW", "TRADE_SKILL_SHOW", "CRAFT_SHOW" }
+for _, event in ipairs(EVENTS) do
   pcall(frame.RegisterEvent, frame, event)
+end
+
+-- Tryb podsłuchu (/dhah spy): zlicza zdarzenia z nazwą dotyczącą aukcji, żeby zobaczyć, co robi klient.
+local spy = nil
+local function isAuctionEvent(name)
+  return name:find("AUCTION") or name:find("REPLICATE") or name:find("COMMODIT") or name:find("BROWSE")
 end
 
 local function reportKnown(added, profession, total)
@@ -41,12 +48,17 @@ local function addButton(parent, name, kind)
 end
 
 frame:SetScript("OnEvent", function(_, event, arg1)
+  if spy and isAuctionEvent(event) then spy[event] = (spy[event] or 0) + 1 end
   if event == "ADDON_LOADED" and arg1 == ADDON then
     DealHunterAHDB = DealHunterAHDB or {}
     DealHunterAHDB.items = DealHunterAHDB.items or {}
     DealHunterAHDB.known = DealHunterAHDB.known or {}
   elseif event == "AUCTION_ITEM_LIST_UPDATE" then
-    ns.Scanner.onListUpdate()
+    ns.Scanner.onListUpdate("classic")
+  elseif event == "REPLICATE_ITEM_LIST_UPDATE" then
+    ns.Scanner.onListUpdate("replicate")
+  elseif event == "AUCTION_HOUSE_SHOW" then
+    ns.ahOpened = (ns.ahOpened or 0) + 1
   elseif event == "TRADE_SKILL_SHOW" then
     pcall(addButton, _G.TradeSkillFrame, "DealHunterAHRecipesButton", "tradeskill")
   elseif event == "CRAFT_SHOW" then
@@ -77,6 +89,41 @@ local function cmdStatus()
   say("plik zapisuje się przy /reload albo wylogowaniu: WTF/Account/<konto>/SavedVariables/DealHunterAH.lua")
 end
 
+local function cmdDebug()
+  say("diagnostyka aukcji (przepisz to, jeśli ceny się nie zapisują):")
+  local ah = C_AuctionHouse
+  say(("API klasyczne: GetNumAuctionItems=%s, GetAuctionItemInfo=%s, QueryAuctionItems=%s"):format(
+    type(GetNumAuctionItems), type(GetAuctionItemInfo), type(QueryAuctionItems)))
+  say(("API replicate: C_AuctionHouse=%s, GetNumReplicateItems=%s, GetReplicateItemInfo=%s, ReplicateItems=%s"):format(
+    type(ah), type(ah and ah.GetNumReplicateItems), type(ah and ah.GetReplicateItemInfo), type(ah and ah.ReplicateItems)))
+  say(("zdarzenia list aukcji: klasyczne %d, replicate %d; otwarć AH: %d"):format(
+    ns.Scanner.events.classic, ns.Scanner.events.replicate, ns.ahOpened or 0))
+  say(("ostatnia lista: %s; pominiętych częściowych: %d"):format(ns.Scanner.lastInfo, ns.Scanner.ignored))
+  if GetNumAuctionItems then say(("GetNumAuctionItems(\"list\") teraz: %s"):format(table.concat({ tostring((GetNumAuctionItems("list"))), tostring(select(2, GetNumAuctionItems("list"))) }, " / "))) end
+  if ah and ah.GetNumReplicateItems then say(("GetNumReplicateItems() teraz: %s"):format(tostring(ah.GetNumReplicateItems()))) end
+  if spy then
+    local names = {}
+    for name, n in pairs(spy) do names[#names + 1] = ("%s=%d"):format(name, n) end
+    table.sort(names)
+    say("podsłuch zdarzeń: " .. (#names > 0 and table.concat(names, ", ") or "nic nie złapano"))
+  else
+    say("podsłuch zdarzeń wyłączony (włącz: /dhah spy, zrób skan, potem /dhah debug)")
+  end
+end
+
+local function cmdSpy()
+  if spy then
+    frame:UnregisterAllEvents()
+    for _, event in ipairs(EVENTS) do pcall(frame.RegisterEvent, frame, event) end
+    say("podsłuch wyłączony.")
+    spy = nil
+  else
+    spy = {}
+    frame:RegisterAllEvents()
+    say("podsłuch włączony: zrób skan AH, potem wpisz /dhah debug. Wyłącz: /dhah spy.")
+  end
+end
+
 local function cmdItem(arg)
   local itemId = tonumber(arg) or tonumber(arg:match("item:(%d+)"))
   if not itemId then return say("użycie: /dhah item <link lub id>") end
@@ -95,6 +142,8 @@ SlashCmdList["DEALHUNTERAH"] = function(msg)
   local cmd, arg = msg:match("^(%S*)%s*(.*)$")
   if cmd == "" or cmd == "status" then cmdStatus()
   elseif cmd == "item" then cmdItem(arg)
+  elseif cmd == "debug" then cmdDebug()
+  elseif cmd == "spy" then cmdSpy()
   elseif cmd == "recipes" or cmd == "scan" then
     -- zapisuje otwarte okno profesji (tradeskill i/lub craft)
     local added, prof, total = ns.Known.scanTradeSkill()
@@ -107,5 +156,5 @@ SlashCmdList["DEALHUNTERAH"] = function(msg)
     DealHunterAHDB.known = {}
     say("usunięto zapisane ceny i receptury.")
   elseif cmd == "reset" then say("to usunie wszystkie zapisane ceny i receptury. Potwierdź: /dhah reset yes")
-  else say("komendy: /dhah (status) | /dhah recipes (zapisz otwarte okno profesji) | /dhah item <link> | /dhah reset yes") end
+  else say("komendy: /dhah (status) | /dhah recipes (zapisz otwarte okno profesji) | /dhah item <link> | /dhah debug | /dhah spy | /dhah reset yes") end
 end

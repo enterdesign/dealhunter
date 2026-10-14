@@ -17,6 +17,14 @@ function GetAuctionItemInfo(kind, i)
   local a = _auction[i]
   return a.name or "x", nil, a.count, 1, nil, nil, nil, 0, 0, a.buyout, 0, nil, nil, a.owner, nil, nil, a.itemId, true
 end
+_replicate = nil
+C_AuctionHouse = {
+  GetNumReplicateItems = function() return _replicate and #_replicate or 0 end,
+  GetReplicateItemInfo = function(i)
+    local a = _replicate[i + 1]                       -- numeracja od 0
+    return "x", nil, a.count, 1, nil, nil, nil, 0, 0, a.buyout, 0, nil, nil, a.owner, nil, nil, a.itemId, true
+  end,
+}
 _timers = {}
 C_Timer = { After = function(sec, fn) _timers[#_timers + 1] = fn end }
 _printed = {}
@@ -147,6 +155,51 @@ class ScannerTests(unittest.TestCase):
 
 def trade(lua, name, rows):
     lua.globals()._trade = lua.table(name=name, rows=lua.table_from([lua.table(kind=k, link=l) for k, l in rows]))
+
+
+class ReplicateTests(unittest.TestCase):
+    def setUp(self):
+        self.lua, self.ns = load()
+
+    def set_list(self, rows):
+        self.lua.globals()._replicate = self.lua.table_from([
+            self.lua.table(itemId=i, buyout=b, count=c, owner=o) for i, b, c, o in rows])
+
+    def run_scan(self):
+        self.lua.execute("_timers = {}")
+        self.ns.Scanner.onListUpdate("replicate")
+        self.ns.Scanner.onListUpdate("replicate")
+        self.assertEqual(len(self.lua.eval("_timers")), 1)
+        self.ns.Scanner.process()
+
+    def history(self, item):
+        return self.lua.eval("DealHunterAHDB.items")[item]["history"]
+
+    def test_replicate_scan_is_recorded_zero_indexed(self):
+        self.set_list([(100, 1000, 1, "a"), (100, 3000, 1, "b"), (200, 500, 5, "c")])   # w tym pierwsza oferta (indeks 0)
+        self.run_scan()
+        p = self.history(100)[1]
+        self.assertEqual((p["low"], p["qty"]), (1000, 2))
+        self.assertEqual(self.history(200)[1]["low"], 100)
+        self.assertEqual(self.ns.Scanner.events["replicate"], 2)
+
+    def test_replicate_refresh_not_reprocessed(self):
+        self.set_list([(100, 1000, 1, "a"), (100, 3000, 1, "b")])
+        self.run_scan()
+        self.lua.globals()._now = 1700000000 + 20
+        self.run_scan()
+        self.assertEqual(len(list(self.lua.eval("_printed").values())), 1)
+
+    def test_empty_replicate_list_saves_nothing(self):
+        self.set_list([])
+        self.run_scan()
+        self.assertEqual(len(list(self.lua.eval("DealHunterAHDB.items").keys())), 0)
+
+    def test_missing_replicate_api_is_safe(self):
+        self.lua.execute("C_AuctionHouse = nil")
+        self.ns.Scanner.onListUpdate("replicate")
+        self.ns.Scanner.process()
+        self.assertEqual(len(list(self.lua.eval("DealHunterAHDB.items").keys())), 0)
 
 
 class KnownTests(unittest.TestCase):
