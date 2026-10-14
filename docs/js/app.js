@@ -1,10 +1,10 @@
-import { loadSavedVariables, makeContext, makeDisenchant, selectHouse } from "./datasource.js?v=af658772";
-import { kvSet, kvGet, kvDelete } from "./store.js?v=af658772";
-import { trend, formatMoney, formatPct, netProceeds } from "./engine.js?v=af658772";
+import { loadSavedVariables, makeContext, makeDisenchant, selectHouse } from "./datasource.js?v=e6237e29";
+import { kvSet, kvGet, kvDelete } from "./store.js?v=e6237e29";
+import { trend, formatMoney, formatPct, netProceeds } from "./engine.js?v=e6237e29";
 import {
   professionIndex, vendorFlips, craftFlips, disenchantFlips, ahFlips, resolveWatchlist, guideInvestments,
   filterRows, sortRows, runCheck, onlyProfitable, filterReliable, filterBop, NO_PROFESSION,
-} from "./opportunities.js?v=af658772";
+} from "./opportunities.js?v=e6237e29";
 
 const $ = (id) => document.getElementById(id);
 const MODE = document.body.dataset.mode || "tbc";
@@ -399,6 +399,11 @@ function renderStatus(extra) {
     if (state.model.testData) add("warn", "To są dane testowe z repozytorium, a nie Twój aktualny skan.");
     if (state.model.noMedian) add("dim", "Źródło: Auctionator zapisuje tylko najniższe ceny dzienne i ilość. Mediana i średnia są niedostępne, więc w ich miejsce używana jest najniższa cena.");
   } else add("dim", "Brak danych cenowych - wgraj plik.");
+  if (n) {
+    const k = state.model.known?.size ?? 0;
+    add(k ? "ok" : "dim", k ? `Znane receptury: ${k} (filtr „tylko znane” działa).`
+      : "Znane receptury: brak. Zapisuje je addon DealHunterAH po otwarciu okna profesji (Auctionator ich nie zapisuje); filtr „tylko znane” jest wtedy pusty.");
+  }
   if (state.saveFailed) add("err", "Nie udało się zapamiętać danych w przeglądarce - po odświeżeniu trzeba będzie wgrać plik ponownie.");
   const c = state.catalog;
   add("dim", `Baza: ${state.recipes.length} receptur, ${Object.keys(c.items ?? {}).length} przedmiotów, ` +
@@ -451,27 +456,40 @@ function renderHouses() {
   $("house").value = state.model.house;
 }
 
-async function handleFile(file) {
-  if (!file) return;
-  renderStatus({ cls: "dim", text: `Wczytuję plik ${file.name} (${(file.size / 1048576).toFixed(1)} MB)…` });
+// Wgrywanie jednego lub kilku plików. Ceny bierzemy z pliku z najnowszym skanem (przy remisie z DealHunterAH,
+// bo ma też medianę i średnią), a znane receptury z wszystkich wgranych plików łączymy.
+async function handleFiles(fileList) {
+  const files = [...fileList];
+  if (!files.length) return;
+  const names = files.map((f) => f.name).join(", ");
+  renderStatus({ cls: "dim", text: `Wczytuję: ${names} (${(files.reduce((n, f) => n + f.size, 0) / 1048576).toFixed(1)} MB)…` });
   try {
-    const res = loadSavedVariables(await readBinaryText(file));
-    if (res.error) return refresh({ cls: "err", text: res.error });
-    state.model = res;
+    const results = [];
+    for (const f of files) results.push({ name: f.name, res: loadSavedVariables(await readBinaryText(f)) });
+    const ok = results.filter((r) => !r.res.error).map((r) => r.res);
+    if (!ok.length) return refresh({ cls: "err", text: results.map((r) => `${r.name}: ${r.res.error}`).join(" | ") });
+
+    const withPrices = ok.filter((m) => m.items.size > 0)
+      .sort((a, b) => b.scannedAt - a.scannedAt || (a.source === "DealHunterAH" ? -1 : 1));
+    const known = new Set(ok.flatMap((m) => [...m.known]));
+    const base = withPrices[0] ?? state.model;           // plik bez cen (tylko receptury) nie kasuje wczytanych cen
+    state.model = { ...base, known: known.size ? known : base.known };
+    if (withPrices[0]) delete state.model.testData;      // ceny z własnego pliku zastępują testowe
     await save();
     renderHouses();
-    refresh({ cls: "ok", text: `Wczytano plik ${file.name}.` });
+    const errs = results.filter((r) => r.res.error).map((r) => `${r.name}: ${r.res.error}`);
+    refresh({ cls: errs.length ? "err" : "ok", text: errs.length ? `Wczytano część plików. Błędy: ${errs.join(" | ")}` : `Wczytano: ${names}.` });
   } catch (e) {
-    refresh({ cls: "err", text: `Nie udało się wczytać pliku ${file.name}: ${e.message}` });
+    refresh({ cls: "err", text: `Nie udało się wczytać plików (${names}): ${e.message}` });
   }
 }
 
 function wire() {
   const drop = $("drop");
-  $("file").addEventListener("change", (e) => { handleFile(e.target.files[0]); e.target.value = ""; });
+  $("file").addEventListener("change", (e) => { const files = [...e.target.files]; e.target.value = ""; handleFiles(files); });
   for (const ev of ["dragenter", "dragover"]) drop.addEventListener(ev, (e) => { e.preventDefault(); drop.classList.add("over"); });
   for (const ev of ["dragleave", "drop"]) drop.addEventListener(ev, (e) => { e.preventDefault(); drop.classList.remove("over"); });
-  drop.addEventListener("drop", (e) => handleFile(e.dataTransfer.files[0]));
+  drop.addEventListener("drop", (e) => handleFiles(e.dataTransfer.files));
 
   $("house").addEventListener("change", (e) => { selectHouse(state.model, e.target.value); save(); refresh(); });
   document.querySelectorAll(".tabs button").forEach((b) => b.addEventListener("click", () => switchTab(b.dataset.tab)));

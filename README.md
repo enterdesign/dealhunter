@@ -17,7 +17,22 @@ Prowizja i depozyt AH są domyślnie wyłączone.
 - **Auctionator** (`Auctionator.lua`): baza cen jest zapisana jako binarny napis CBOR; strona go dekoduje (`docs/js/cbor.js`).
   Auctionator zapisuje tylko najniższe ceny dzienne i ilość (mediana i średnia są niedostępne, używana jest najniższa cena).
   Historia obejmuje dni, w których robiłeś skany, więc flipy według historii poprawiają się z każdym kolejnym skanem.
-- **Addon DealHunterAH**: zapisuje też medianę i średnią (niesprawdzony w grze).
+- **Addon DealHunterAH** (patrz niżej): zapisuje też medianę i średnią oraz znane receptury.
+
+## Addon DealHunterAH
+Zbieracz danych (bez okna i bez automatyzacji): zapisuje ceny z **każdego** skanu AH, także zrobionego Auctionatorem
+(najniższa cena, mediana, średnia, ilość, historia), oraz **znane receptury** postaci.
+Analizę robi strona. Addon niczego nie kupuje, nie wystawia i nie wysyła zapytań do AH.
+
+1. Pobierz `docs/DealHunterAH.zip` (link jest też na stronie) i rozpakuj do `World of Warcraft/<wersja>/Interface/AddOns/`
+   (powstanie folder `DealHunterAH`). Numer `Interface` w `.toc` to 20506; jeśli addon nie widać na liście, sprawdź build
+   komendą `/dump (select(4, GetBuildInfo()))` albo zaznacz "Load out of date AddOns".
+2. Zrób skan AH (np. Auctionatorem). W czacie pojawi się "zapisano ceny N przedmiotów".
+3. Otwórz okno każdej profesji (rozwiń wszystkie kategorie i wyłącz filtry), także Enchanting. Pojawi się "zapisano N nowych receptur".
+4. Wpisz `/reload` (plik zapisuje się przy `/reload` albo wylogowaniu) i wgraj na stronie
+   `WTF/Account/<konto>/SavedVariables/DealHunterAH.lua` (opcjonalnie razem z `Auctionator.lua`).
+
+Komendy: `/dhah` (status), `/dhah item <link>`, `/dhah reset yes`. Po zmianach w `addon/` uruchom `python3 tools/pack_addon.py`.
 
 ## Tryby gry
 Strona główna (`docs/index.html`) wybiera tryb. Dostępny: **TBC Anniversary** (`docs/tbc/`, dane w `docs/data/tbc/`).
@@ -32,9 +47,9 @@ Strona główna (`docs/index.html`) wybiera tryb. Dostępny: **TBC Anniversary**
   - `fetch_wago.py` + `build_data.py` - receptury i przedmioty z tabel DB2 (wago.tools),
   - `build_vendors.py`, `build_disenchant.py` - ceny u kupców i wyniki rozbioru (zakładki Wowheada, z cache'em w `data-raw/`),
   - `build_strategies.py` - strategie i listy przedmiotów z guidów.
-- `addon/DealHunterAH/` - addon do gry zbierający ceny z AH do pliku SavedVariables (niesprawdzony w grze).
+- `addon/DealHunterAH/` - addon do gry (zbieracz cen i receptur); `docs/DealHunterAH.zip` to jego paczka do pobrania (`tools/pack_addon.py`). Niesprawdzony w grze.
 - `web-tests/` - testy strony: `node --test web-tests/site.test.mjs` (Node 20+).
-- `tests/` - testy Pythona (generatory danych) i silnika Lua: `python3 -m unittest discover -s tests` (wymaga `pip install lupa`).
+- `tests/` - testy Pythona (generatory danych, addon na atrapach API gry, paczka ZIP): `python3 -m unittest discover -s tests` (wymaga `pip install lupa`).
 
 ## Ograniczenia danych
 - Wyniki rozbioru to średnie z obserwacji graczy na Wowheadzie (nie z tabel serwera).
