@@ -36,6 +36,12 @@
       <strong>Przeciągnij plik SavedVariables tutaj</strong> albo kliknij, żeby wybrać
       <span class="hint"><code>Auctionator.lua</code> albo <code>DealHunterAH.lua</code> z <code>WTF/Account/…/SavedVariables/</code> (po <code>/reload</code> w grze)</span>
     </label>
+    <div class="toolbar" id="linkBar" hidden>
+      <button type="button" id="linkBtn" title="Wskaż pliki SavedVariables raz; potem odświeżasz je jednym przyciskiem">Połącz z plikami…</button>
+      <button type="button" id="refreshBtn" hidden>Odśwież z połączonych plików</button>
+      <button type="button" id="unlinkBtn" hidden>Odłącz</button>
+      <span class="hint" id="linkInfo"></span>
+    </div>
     <p class="hint addon">Addon do gry zbierający ceny z pełnego skanu AH (skanuje Auctionator) i znane receptury (przycisk „Zapisz receptury” w oknie profesji):
       <a href="../DealHunterAH.zip">pobierz DealHunterAH.zip</a> (rozpakuj do <code>Interface/AddOns/</code>).
       Możesz wgrać kilka plików naraz, np. <code>Auctionator.lua</code> i <code>DealHunterAH.lua</code>.</p>
@@ -117,6 +123,6 @@
   </section>
 </main>
 
-<script type="module" src="../js/app.js?v=94de9c7d"></script>
+<script type="module" src="../js/app.js?v=02a553d7"></script>
 </body>
 </html>

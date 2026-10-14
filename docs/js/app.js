@@ -1,10 +1,10 @@
-import { loadSavedVariables, makeContext, makeDisenchant, selectHouse } from "./datasource.js?v=94de9c7d";
-import { kvSet, kvGet, kvDelete } from "./store.js?v=94de9c7d";
-import { trend, formatMoney, formatPct, netProceeds } from "./engine.js?v=94de9c7d";
+import { loadSavedVariables, makeContext, makeDisenchant, selectHouse } from "./datasource.js?v=02a553d7";
+import { kvSet, kvGet, kvDelete } from "./store.js?v=02a553d7";
+import { trend, formatMoney, formatPct, netProceeds } from "./engine.js?v=02a553d7";
 import {
   professionIndex, vendorFlips, craftFlips, disenchantFlips, ahFlips, resolveWatchlist, guideInvestments,
   filterRows, sortRows, runCheck, onlyProfitable, filterReliable, filterBop, NO_PROFESSION,
-} from "./opportunities.js?v=94de9c7d";
+} from "./opportunities.js?v=02a553d7";
 
 const $ = (id) => document.getElementById(id);
 const MODE = document.body.dataset.mode || "tbc";
@@ -26,7 +26,11 @@ const DEAL_KINDS = [
     help: "Przedmioty polecane w guidach (zakładka Strategie) z aktualną ceną i dystansem do typowej ceny." },
 ];
 
+const LINK_KEY = "linkedFiles";
+const canLink = typeof window.showOpenFilePicker === "function";   // Chrome, Edge; nie Firefox ani Safari
+
 const state = {
+  linked: [], fileInfo: [],
   model: { items: new Map(), known: new Set(), scannedAt: 0 },
   recipes: [], catalog: { items: {} }, strategies: [], profIdx: new Map(), watch: [],
   tab: "deals", deal: "craft", profession: "", sortBy: "profit", sortDir: "desc",
@@ -399,6 +403,10 @@ function renderStatus(extra) {
     if (state.model.testData) add("warn", "To są dane testowe z repozytorium, a nie Twój aktualny skan.");
     if (state.model.noMedian) add("dim", "Źródło: Auctionator zapisuje tylko najniższe ceny dzienne i ilość. Mediana i średnia są niedostępne, więc w ich miejsce używana jest najniższa cena.");
   } else add("dim", "Brak danych cenowych - wgraj plik.");
+  if (state.fileInfo.length) {
+    add("dim", "Pliki: " + state.fileInfo.map((f) => `${f.name} (zapisany w grze ${new Date(f.modified).toLocaleString("pl-PL")})`).join(", ") +
+      ". Plik zapisuje się przy /reload albo wylogowaniu.");
+  }
   if (n) {
     const k = state.model.known?.size ?? 0;
     add(k ? "ok" : "dim", k ? `Znane receptury: ${k} (filtr „tylko znane” działa).`
@@ -475,6 +483,7 @@ async function handleFiles(fileList) {
     const base = withPrices[0] ?? state.model;           // plik bez cen (tylko receptury) nie kasuje wczytanych cen
     state.model = { ...base, known: known.size ? known : base.known };
     if (withPrices[0]) delete state.model.testData;      // ceny z własnego pliku zastępują testowe
+    state.fileInfo = files.map((f) => ({ name: f.name, modified: f.lastModified }));
     await save();
     renderHouses();
     const errs = results.filter((r) => r.res.error).map((r) => `${r.name}: ${r.res.error}`);
@@ -484,6 +493,63 @@ async function handleFiles(fileList) {
   }
 }
 
+// ---------- połączenie z plikami na dysku (File System Access API) ----------
+function renderLinked() {
+  $("linkBar").hidden = false;
+  if (!canLink) {
+    $("linkBtn").hidden = $("refreshBtn").hidden = $("unlinkBtn").hidden = true;
+    $("linkInfo").textContent = "Ta przeglądarka nie obsługuje łączenia z plikiem (użyj Chrome lub Edge). Wgrywaj plik ręcznie.";
+    return;
+  }
+  const has = state.linked.length > 0;
+  $("linkBtn").hidden = has;
+  $("refreshBtn").hidden = $("unlinkBtn").hidden = !has;
+  $("linkInfo").textContent = has ? `Połączono z: ${state.linked.map((h) => h.name).join(", ")}. Po skanie wpisz /reload w grze i kliknij „Odśwież”.` : "";
+}
+
+async function linkFiles() {
+  try {
+    const handles = await window.showOpenFilePicker({
+      multiple: true, types: [{ description: "Pliki SavedVariables (.lua)", accept: { "text/plain": [".lua"] } }],
+    });
+    state.linked = handles;
+    await kvSet(LINK_KEY, handles);
+    renderLinked();
+    await refreshLinked(true);
+  } catch (e) {
+    if (e?.name !== "AbortError") refresh({ cls: "err", text: `Nie udało się połączyć z plikami: ${e.message}` });
+  }
+}
+
+// Odczytuje połączone pliki ponownie. interactive=false: bez pytania o zgodę (przy starcie strony).
+async function refreshLinked(interactive = true) {
+  if (!state.linked.length) return false;
+  try {
+    const files = [];
+    for (const h of state.linked) {
+      let perm = await h.queryPermission({ mode: "read" });
+      if (perm !== "granted" && interactive) perm = await h.requestPermission({ mode: "read" });
+      if (perm !== "granted") {
+        if (interactive) refresh({ cls: "err", text: `Brak zgody na odczyt pliku ${h.name}.` });
+        return false;
+      }
+      files.push(await h.getFile());
+    }
+    await handleFiles(files);
+    return true;
+  } catch (e) {
+    refresh({ cls: "err", text: `Nie można odczytać połączonych plików (przeniesione lub usunięte?): ${e.message}. Odłącz i połącz ponownie.` });
+    return false;
+  }
+}
+
+async function unlinkFiles() {
+  state.linked = [];
+  await kvDelete(LINK_KEY);
+  renderLinked();
+  refresh({ cls: "dim", text: "Odłączono pliki. Dane w przeglądarce zostają do czasu wgrania nowych." });
+}
+
 function wire() {
   const drop = $("drop");
   $("file").addEventListener("change", (e) => { const files = [...e.target.files]; e.target.value = ""; handleFiles(files); });
@@ -491,6 +557,9 @@ function wire() {
   for (const ev of ["dragleave", "drop"]) drop.addEventListener(ev, (e) => { e.preventDefault(); drop.classList.remove("over"); });
   drop.addEventListener("drop", (e) => handleFiles(e.dataTransfer.files));
 
+  $("linkBtn").addEventListener("click", linkFiles);
+  $("refreshBtn").addEventListener("click", () => refreshLinked(true));
+  $("unlinkBtn").addEventListener("click", unlinkFiles);
   $("house").addEventListener("change", (e) => { selectHouse(state.model, e.target.value); save(); refresh(); });
   document.querySelectorAll(".tabs button").forEach((b) => b.addEventListener("click", () => switchTab(b.dataset.tab)));
   $("profession").addEventListener("change", (e) => { state.profession = e.target.value; renderDeals(); });
@@ -513,9 +582,6 @@ function wire() {
 
 async function init() {
   wire();
-  const restored = await restore();
-  const testScan = restored ? false : await loadTestScan();
-  renderHouses();
   const [recipes, items, vendors, de, strategies] = await Promise.all([
     loadJson("recipes.json", []), loadJson("items.json", { items: {} }), loadJson("vendors.json", { prices: {} }),
     loadJson("disenchant.json", null), loadJson("strategies.json", { strategies: [] }),
@@ -525,7 +591,15 @@ async function init() {
   state.strategies = strategies.strategies ?? [];
   state.profIdx = professionIndex(recipes);
   renderProfessionSelects();
-  refresh(restored ? { cls: "dim", text: "Przywrócono dane zapisane w tej przeglądarce podczas poprzedniej wizyty." }
+
+  let restored = await restore();
+  state.linked = canLink ? ((await kvGet(LINK_KEY)) ?? []) : [];
+  renderLinked();
+  const fresh = state.linked.length ? await refreshLinked(false) : false;   // bez pytania, gdy zgoda jest zapamiętana
+  if (fresh) return;                                                          // refreshLinked odświeżył widok
+  const testScan = restored || state.model.items.size ? false : await loadTestScan();
+  renderHouses();
+  refresh(restored ? { cls: "dim", text: "Przywrócono dane zapisane w tej przeglądarce podczas poprzedniej wizyty. Kliknij „Odśwież z połączonych plików”, żeby wczytać nowszy skan." }
     : testScan ? { cls: "dim", text: "Wczytano skan testowy z repozytorium (okrojony Auctionator.lua). Wgraj własny plik, żeby go zastąpić." }
     : undefined);
 }

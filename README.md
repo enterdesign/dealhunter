@@ -38,6 +38,8 @@ Instalacja i użycie:
 3. W oknie każdej profesji kliknij "Zapisz receptury". Pojawi się "zapisano N nowych receptur".
 4. Wpisz `/reload` (plik zapisuje się przy `/reload` albo wylogowaniu) i wgraj na stronie
    `WTF/Account/<konto>/SavedVariables/DealHunterAH.lua` (opcjonalnie razem z `Auctionator.lua`).
+   W Chrome i Edge kliknij raz „Połącz z plikami…” i wskaż pliki; potem po każdym skanie wystarczy `/reload` w grze
+   i przycisk „Odśwież z połączonych plików” (przeglądarka zapamiętuje połączenie, czasem pyta o zgodę na odczyt).
 
 Komendy: `/dhah` (status), `/dhah recipes`, `/dhah item <link>`, `/dhah reset yes`.
 Po zmianach w `addon/` uruchom `python3 tools/pack_addon.py`.
