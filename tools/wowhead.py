@@ -4,11 +4,14 @@ Dane są pobierane raz i trzymane w data-raw/wowhead/ (poza repo). Opóźnienie 
 jest celowo duże - to jednorazowe, osobiste pobranie, nie crawler.
 """
 import json
+import os
 import pathlib
 import time
+import urllib.error
 import urllib.request
 
-BASE = "https://www.wowhead.com/tbc/item={}"
+# Wersja bazy Wowheada: "tbc" (domyślnie) albo "classic" (WoW Forever); zmienia się zmienną WOWHEAD_GAME.
+BASE = "https://www.wowhead.com/" + os.environ.get("WOWHEAD_GAME", "tbc") + "/item={}"
 DELAY = 1.2
 _last = [0.0]
 
@@ -27,6 +30,12 @@ def fetch_item(item_id, cache_dir, delay=DELAY):
             with urllib.request.urlopen(req, timeout=60) as r:
                 html = r.read().decode("utf-8", errors="replace")
             break
+        except urllib.error.HTTPError as e:
+            if e.code == 404:  # przedmiotu nie ma w tej wersji gry (np. materiał z TBC w Classic)
+                html = ""
+                break
+            last_err = e
+            time.sleep(3 * (attempt + 1))
         except Exception as e:  # noqa: BLE001 - ponawiamy dowolny błąd sieci
             last_err = e
             time.sleep(3 * (attempt + 1))

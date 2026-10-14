@@ -1,0 +1,451 @@
+{
+ "updated": "2026-10-14",
+ "strategies": [
+  {
+   "id": "ceny-na-serwerze",
+   "profession": "Ogólne",
+   "tier": null,
+   "title": "Sprawdzaj ceny na własnym serwerze",
+   "summary": "Każda lista \"co się opłaca\" jest uśredniona. Ekonomia serwera potrafi ją odwrócić, więc decyzję podejmuj po własnym skanie AH.",
+   "points": [
+    "Zrób pełny skan AH przed zakupem materiałów.",
+    "Porównuj zysk z receptur i flipów w zakładce Okazje.",
+    "Zwracaj uwagę na przedmioty BoP - nie da się ich sprzedać na AH.",
+    "Pamiętaj, że strona na razie nie odlicza prowizji i depozytu AH."
+   ],
+   "sources": [
+    {
+     "title": "Wowhead: Gold Making (Classic)",
+     "url": "https://www.wowhead.com/classic/guides/gold-making",
+     "reliability": "średnia",
+     "note": "ogólny punkt odniesienia; konkretne wskazówki poniżej to wiedza ogólna o Classic, niezweryfikowana na Twoim serwerze"
+    }
+   ]
+  },
+  {
+   "id": "flipy-ah",
+   "profession": "Ogólne",
+   "tier": null,
+   "title": "Flipy na AH: kupuj poniżej typowej ceny",
+   "summary": "Podstawowa zasada: kup przedmiot taniej niż zwykle i sprzedaj w normalnej cenie. Strona porównuje aktualną najniższą cenę z historią Twoich skanów.",
+   "points": [
+    "Kupuj, gdy najniższa cena jest wyraźnie poniżej mediany z historii (tryb \"Flipy AH\").",
+    "W Forever beta dodatek zapisuje tylko najniższą cenę i ilość, więc \"mediana\" jest wtedy najniższą ceną z danego skanu.",
+    "Zwracaj uwagę na trend: spadająca cena może oznaczać, że \"okazja\" dalej tanieje."
+   ],
+   "sources": [
+    {
+     "title": "Wowhead: Gold Making (Classic)",
+     "url": "https://www.wowhead.com/classic/guides/gold-making",
+     "reliability": "średnia",
+     "note": "ogólny punkt odniesienia; konkretne wskazówki poniżej to wiedza ogólna o Classic, niezweryfikowana na Twoim serwerze"
+    }
+   ]
+  },
+  {
+   "id": "vendor-flipy",
+   "profession": "Ogólne",
+   "tier": null,
+   "title": "Flipy do kupca: przedmioty na AH tańsze niż cena skupu",
+   "summary": "Zdarza się, że przedmiot wystawiony na AH jest tańszy niż suma, którą zapłaci kupiec. To najprostszy, bezryzykowny zysk.",
+   "points": [
+    "Tryb \"Flipy do vendora\" w zakładce Okazje wylicza je ze skanu.",
+    "Zysk jest mały na sztukę, więc liczy się ilość ofert."
+   ],
+   "sources": [
+    {
+     "title": "Wowhead: Gold Making (Classic)",
+     "url": "https://www.wowhead.com/classic/guides/gold-making",
+     "reliability": "średnia",
+     "note": "ogólny punkt odniesienia; konkretne wskazówki poniżej to wiedza ogólna o Classic, niezweryfikowana na Twoim serwerze"
+    }
+   ]
+  },
+  {
+   "id": "alchemy",
+   "profession": "Alchemy",
+   "tier": "S",
+   "title": "Alchemy: mikstury, eliksiry i flaski na raidy",
+   "summary": "Alchemia sprzedaje się stabilnie, bo raidy i PvP zużywają mikstury. Największy popyt mają eliksiry bojowe i ochronne oraz flaski.",
+   "points": [
+    "Flaski (Flask of the Titans, Flask of Petrification) są drogie, ale wymagają Black Lotus i rzadkich ziół - sprawdź koszt w Okazjach.",
+    "Mikstury lecznicze i many z wyższego poziomu schodzą stale.",
+    "Ceny ziół skaczą z podażą - ten sam przepis raz jest opłacalny, raz nie."
+   ],
+   "items": [
+    {
+     "name": "Flask of the Titans",
+     "value": "wysoka"
+    },
+    {
+     "name": "Flask of Petrification",
+     "value": "wysoka"
+    },
+    {
+     "name": "Elixir of the Mongoose",
+     "value": "wysoka"
+    },
+    {
+     "name": "Major Healing Potion",
+     "value": "wysoka"
+    },
+    {
+     "name": "Greater Fire Protection Potion",
+     "value": "średnia"
+    },
+    {
+     "name": "Mighty Rage Potion",
+     "value": "średnia"
+    }
+   ],
+   "check": {
+    "type": "topRecipes",
+    "profession": "Alchemy"
+   },
+   "sources": [
+    {
+     "title": "Wowhead: Gold Making (Classic)",
+     "url": "https://www.wowhead.com/classic/guides/gold-making",
+     "reliability": "średnia",
+     "note": "ogólny punkt odniesienia; konkretne wskazówki poniżej to wiedza ogólna o Classic, niezweryfikowana na Twoim serwerze"
+    }
+   ]
+  },
+  {
+   "id": "tailoring",
+   "profession": "Tailoring",
+   "tier": "S",
+   "title": "Tailoring: sztuki materiału i torby",
+   "summary": "Krawiectwo opiera się na tanim, łatwo farmionym materiale (Mageweave, Runecloth). Sprzedają się sztuki materiału, torby i bandaże.",
+   "points": [
+    "Bolt of Runecloth i Bolt of Mageweave bywa drożej sprzedać jako sztukę niż jako surowiec.",
+    "Torby (Mageweave Bag, Runecloth Bag) mają stałe zapotrzebowanie.",
+    "Heavy Runecloth Bandage kupują gracze na PvP i farmie."
+   ],
+   "items": [
+    {
+     "name": "Runecloth Bag",
+     "value": "wysoka"
+    },
+    {
+     "name": "Bolt of Runecloth",
+     "value": "wysoka"
+    },
+    {
+     "name": "Mageweave Bag",
+     "value": "średnia"
+    },
+    {
+     "name": "Bolt of Mageweave",
+     "value": "średnia"
+    },
+    {
+     "name": "Heavy Runecloth Bandage",
+     "value": "średnia"
+    }
+   ],
+   "check": {
+    "type": "topRecipes",
+    "profession": "Tailoring"
+   },
+   "sources": [
+    {
+     "title": "Wowhead: Gold Making (Classic)",
+     "url": "https://www.wowhead.com/classic/guides/gold-making",
+     "reliability": "średnia",
+     "note": "ogólny punkt odniesienia; konkretne wskazówki poniżej to wiedza ogólna o Classic, niezweryfikowana na Twoim serwerze"
+    }
+   ]
+  },
+  {
+   "id": "enchanting",
+   "profession": "Enchanting",
+   "tier": "S",
+   "title": "Enchanting: rozbiór (disenchant) i zaklęcia",
+   "summary": "Enchanter zarabia na rozbiorze zielonych i niebieskich przedmiotów oraz na zaklęciach. Materiały z rozbioru możesz też sprzedawać.",
+   "points": [
+    "Zakładka Okazje liczy wartość oczekiwaną rozbioru (EV) z rozrzutem i pewnością.",
+    "Kupuj na AH przedmioty, których EV rozbioru jest wyższe niż cena.",
+    "Wartość pewności zależy od liczby obserwacji, które zebrano dla danego przedziału."
+   ],
+   "items": [
+    {
+     "name": "Greater Eternal Essence",
+     "value": "wysoka"
+    },
+    {
+     "name": "Large Brilliant Shard",
+     "value": "wysoka"
+    }
+   ],
+   "check": {
+    "type": "topRecipes",
+    "profession": "Enchanting"
+   },
+   "sources": [
+    {
+     "title": "Wowhead: Gold Making (Classic)",
+     "url": "https://www.wowhead.com/classic/guides/gold-making",
+     "reliability": "średnia",
+     "note": "ogólny punkt odniesienia; konkretne wskazówki poniżej to wiedza ogólna o Classic, niezweryfikowana na Twoim serwerze"
+    }
+   ]
+  },
+  {
+   "id": "blacksmithing",
+   "profession": "Blacksmithing",
+   "tier": "B",
+   "title": "Blacksmithing: kamienie, pancerze i sztabki",
+   "summary": "Kowalstwo zarabia na kamieniach do ostrzenia, sztabkach i wybranych pancerzach. Wiele rzeczy wymaga Miningu.",
+   "points": [
+    "Kamienie (Dense, Elemental Sharpening Stone) mają stały popyt.",
+    "Arcanite Bar jest ceniony przez alchemików i kowali."
+   ],
+   "items": [
+    {
+     "name": "Lionheart Helm",
+     "value": "wysoka"
+    },
+    {
+     "name": "Arcanite Bar",
+     "value": "wysoka"
+    },
+    {
+     "name": "Dense Sharpening Stone",
+     "value": "średnia"
+    },
+    {
+     "name": "Elemental Sharpening Stone",
+     "value": "średnia"
+    }
+   ],
+   "check": {
+    "type": "topRecipes",
+    "profession": "Blacksmithing"
+   },
+   "sources": [
+    {
+     "title": "Wowhead: Gold Making (Classic)",
+     "url": "https://www.wowhead.com/classic/guides/gold-making",
+     "reliability": "średnia",
+     "note": "ogólny punkt odniesienia; konkretne wskazówki poniżej to wiedza ogólna o Classic, niezweryfikowana na Twoim serwerze"
+    }
+   ]
+  },
+  {
+   "id": "leatherworking",
+   "profession": "Leatherworking",
+   "tier": "B",
+   "title": "Leatherworking: skóry i pancerze",
+   "summary": "Rymarstwo sprzedaje się dzięki wyrobom ze skór i dodatkom do pancerza. Dobry zysk przy własnym skórowaniu.",
+   "points": [
+    "Rugged Leather, Core Leather i Enchanted Leather to materiały, które często są warte więcej sprzedane niż przerobione.",
+    "Pancerze z rzadkimi recepturami (np. Wicked Leather Gauntlets) sprzedają się drożej."
+   ],
+   "items": [
+    {
+     "name": "Core Leather",
+     "value": "średnia"
+    },
+    {
+     "name": "Enchanted Leather",
+     "value": "średnia"
+    },
+    {
+     "name": "Rugged Leather",
+     "value": "średnia"
+    },
+    {
+     "name": "Wicked Leather Gauntlets",
+     "value": "średnia"
+    }
+   ],
+   "check": {
+    "type": "topRecipes",
+    "profession": "Leatherworking"
+   },
+   "sources": [
+    {
+     "title": "Wowhead: Gold Making (Classic)",
+     "url": "https://www.wowhead.com/classic/guides/gold-making",
+     "reliability": "średnia",
+     "note": "ogólny punkt odniesienia; konkretne wskazówki poniżej to wiedza ogólna o Classic, niezweryfikowana na Twoim serwerze"
+    }
+   ]
+  },
+  {
+   "id": "engineering",
+   "profession": "Engineering",
+   "tier": "B",
+   "title": "Engineering: ładunki, granaty i narzędzia",
+   "summary": "Inżynieria sprzedaje materiały wybuchowe i narzędzia na raidy i PvP. Wiele wyrobów jest używanych głównie przez inżynierów.",
+   "points": [
+    "Goblin Sapper Charge i Thorium Grenade mają stały popyt w PvP i na raidach.",
+    "Droższe wyroby (np. Gnomish Death Ray) sprzedają się rzadko."
+   ],
+   "items": [
+    {
+     "name": "Goblin Sapper Charge",
+     "value": "średnia"
+    },
+    {
+     "name": "Thorium Grenade",
+     "value": "średnia"
+    },
+    {
+     "name": "Gnomish Death Ray",
+     "value": "niska"
+    }
+   ],
+   "check": {
+    "type": "topRecipes",
+    "profession": "Engineering"
+   },
+   "sources": [
+    {
+     "title": "Wowhead: Gold Making (Classic)",
+     "url": "https://www.wowhead.com/classic/guides/gold-making",
+     "reliability": "średnia",
+     "note": "ogólny punkt odniesienia; konkretne wskazówki poniżej to wiedza ogólna o Classic, niezweryfikowana na Twoim serwerze"
+    }
+   ]
+  },
+  {
+   "id": "mining",
+   "profession": "Mining",
+   "tier": "A",
+   "title": "Mining: sztabki i wydobycie",
+   "summary": "Górnictwo daje surowiec dla kowali i inżynierów. Sprzedajesz rudę albo przetopione sztabki, zależnie od tego, co droższe.",
+   "points": [
+    "Porównaj cenę rudy ze sztabką - czasem opłaca się przetopić, czasem nie.",
+    "Rzadkie żyły (Truesilver, Dark Iron) są warte wyraźnie więcej."
+   ],
+   "items": [
+    {
+     "name": "Dark Iron Bar",
+     "value": "wysoka"
+    },
+    {
+     "name": "Thorium Bar",
+     "value": "wysoka"
+    },
+    {
+     "name": "Truesilver Bar",
+     "value": "wysoka"
+    },
+    {
+     "name": "Mithril Bar",
+     "value": "średnia"
+    }
+   ],
+   "check": {
+    "type": "topRecipes",
+    "profession": "Mining"
+   },
+   "sources": [
+    {
+     "title": "Wowhead: Gold Making (Classic)",
+     "url": "https://www.wowhead.com/classic/guides/gold-making",
+     "reliability": "średnia",
+     "note": "ogólny punkt odniesienia; konkretne wskazówki poniżej to wiedza ogólna o Classic, niezweryfikowana na Twoim serwerze"
+    }
+   ]
+  },
+  {
+   "id": "cooking-firstaid",
+   "profession": "Cooking",
+   "tier": null,
+   "title": "Cooking i First Aid: profesje pomocnicze",
+   "summary": "Jedzenie i bandaże sprzedają się po niewielkich cenach, ale stabilnie. Rzadko robi się na nich duże pieniądze.",
+   "points": [
+    "Jedzenie (np. Nightfin Soup) kupują gracze na raidy.",
+    "Receptury kulinarne i bandaże są w bazie strony, więc Okazje je uwzględniają, jeśli skan ma ich ceny."
+   ],
+   "items": [
+    {
+     "name": "Nightfin Soup",
+     "value": "niska"
+    },
+    {
+     "name": "Heavy Runecloth Bandage",
+     "value": "niska"
+    }
+   ],
+   "sources": [
+    {
+     "title": "Wowhead: Gold Making (Classic)",
+     "url": "https://www.wowhead.com/classic/guides/gold-making",
+     "reliability": "średnia",
+     "note": "ogólny punkt odniesienia; konkretne wskazówki poniżej to wiedza ogólna o Classic, niezweryfikowana na Twoim serwerze"
+    }
+   ]
+  },
+  {
+   "id": "herbalism",
+   "profession": "Herbalism",
+   "tier": "A",
+   "title": "Herbalism: zioła dla alchemików",
+   "summary": "Zielarstwo daje surowiec dla alchemii. Stałe zioła sprzedają się masowo, a rzadkie (Black Lotus, Dreamfoil) osiągają wysokie ceny.",
+   "points": [
+    "Black Lotus i Dreamfoil to jedne z najdroższych ziół.",
+    "Gromsblood i Sungrass sprzedają się masowo.",
+    "Porównaj cenę zioła z ceną mikstury z niego - czasem lepiej sprzedać surowiec."
+   ],
+   "items": [
+    {
+     "name": "Black Lotus",
+     "value": "bardzo wysoka"
+    },
+    {
+     "name": "Dreamfoil",
+     "value": "wysoka"
+    },
+    {
+     "name": "Gromsblood",
+     "value": "średnia"
+    },
+    {
+     "name": "Sungrass",
+     "value": "średnia"
+    }
+   ],
+   "sources": [
+    {
+     "title": "Wowhead: Gold Making (Classic)",
+     "url": "https://www.wowhead.com/classic/guides/gold-making",
+     "reliability": "średnia",
+     "note": "ogólny punkt odniesienia; konkretne wskazówki poniżej to wiedza ogólna o Classic, niezweryfikowana na Twoim serwerze"
+    }
+   ]
+  },
+  {
+   "id": "skinning",
+   "profession": "Skinning",
+   "tier": "B",
+   "title": "Skinning: skóry dla rymarzy",
+   "summary": "Skórowanie daje skóry dla rymarstwa. Sprzedaż jest stabilna, ale ceny zwykłych skór są niskie, a rzadkie warte więcej.",
+   "points": [
+    "Rugged Leather i Core Leather schodzą stale.",
+    "Sprawdź, czy surowa skóra jest droższa od przerobionej w Okazjach."
+   ],
+   "items": [
+    {
+     "name": "Rugged Leather",
+     "value": "średnia"
+    },
+    {
+     "name": "Core Leather",
+     "value": "średnia"
+    }
+   ],
+   "sources": [
+    {
+     "title": "Wowhead: Gold Making (Classic)",
+     "url": "https://www.wowhead.com/classic/guides/gold-making",
+     "reliability": "średnia",
+     "note": "ogólny punkt odniesienia; konkretne wskazówki poniżej to wiedza ogólna o Classic, niezweryfikowana na Twoim serwerze"
+    }
+   ]
+  }
+ ]
+}
