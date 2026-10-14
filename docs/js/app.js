@@ -1,10 +1,10 @@
-import { loadSavedVariables, makeContext, makeDisenchant, selectHouse } from "./datasource.js?v=cb1cefb6";
-import { kvSet, kvGet, kvDelete } from "./store.js?v=cb1cefb6";
-import { trend, formatMoney, formatPct, netProceeds } from "./engine.js?v=cb1cefb6";
+import { loadSavedVariables, makeContext, makeDisenchant, selectHouse } from "./datasource.js?v=af658772";
+import { kvSet, kvGet, kvDelete } from "./store.js?v=af658772";
+import { trend, formatMoney, formatPct, netProceeds } from "./engine.js?v=af658772";
 import {
   professionIndex, vendorFlips, craftFlips, disenchantFlips, ahFlips, resolveWatchlist, guideInvestments,
   filterRows, sortRows, runCheck, onlyProfitable, filterReliable, filterBop, NO_PROFESSION,
-} from "./opportunities.js?v=cb1cefb6";
+} from "./opportunities.js?v=af658772";
 
 const $ = (id) => document.getElementById(id);
 const MODE = document.body.dataset.mode || "tbc";
@@ -17,7 +17,7 @@ const DEAL_KINDS = [
   { id: "vendor", label: "Flipy do vendora",
     help: "Kup na AH taniej, niż płaci kupiec, i sprzedaj kupcowi. Pokazujemy wszystkie skanowane przedmioty (zysk może być ujemny)." },
   { id: "craft", label: "Flipy do profesji",
-    help: "Receptura: koszt składników Y, Z (z AH albo od kupca; składniki sprzedawane przez kupców liczymy po cenie kupca) porównany osobno z: ceną wyrobu X na AH, ceną X u kupca i EV materiałów z rozbioru X. Pod każdą wartością widać zysk albo stratę tej opcji; \"Zysk (najlepsza)\" dotyczy najlepszej z nich. Receptury z bazy gry, także nieznane." },
+    help: "Receptura: koszt składników Y, Z (z AH albo od kupca; składniki sprzedawane przez kupców liczymy po cenie kupca) porównany osobno z: ceną wyrobu X na AH, ceną X u kupca i EV materiałów z rozbioru X. Pod każdą wartością widać zysk albo stratę tej opcji; \"Zysk (najlepsza opcja)\" dotyczy najlepszej z nich (nazwa opcji pod kwotą). \"Trend X\" pokazuje, czy gotowy wyrób jest poszukiwany (cena i liczba ofert z Twoich skanów, potrzebne min. 3). Receptury z bazy gry, także nieznane." },
   { id: "disenchant", label: "Rozbiór",
     help: "Kup przedmiot na AH i go rozbierz: wartość oczekiwana (EV) materiałów z rozbioru, rozrzut i pewność wyniku. Kliknij wiersz, żeby zobaczyć dwa najczęstsze wyniki." },
   { id: "ah", label: "Flipy na AH",
@@ -89,6 +89,16 @@ function optionCell(r, name, profit) {
     el("div", { className: profit >= 0 ? "good small" : "bad small", textContent: `${profit >= 0 ? "+" : ""}${money(profit)}` }));
   return cell;
 }
+// Trend gotowego wyrobu X: zmiana ceny z ostatnich dni i wniosek o popycie (cena i liczba ofert na AH).
+const DEMAND_CLASS = { up: "good", down: "bad", mixed: "warn", flat: "dim", unknown: "dim" };
+function demandCell(r) {
+  const d = r.demand;
+  const cell = el("td", { className: "demand" });
+  const top = d?.price ? `${TREND_LABEL[d.price.dir]} ${formatPct(d.price.change)}` : "-";
+  cell.append(el("div", { className: DEMAND_CLASS[d?.verdict ?? "unknown"], textContent: top }),
+    el("div", { className: "dim small", textContent: d?.label ?? "" }));
+  return cell;
+}
 const profitCell = (r) => td(money(r.profit), "num " + (r.profit >= 0 ? "good" : "bad"));
 
 function trendCell(t) {
@@ -137,9 +147,13 @@ const COLUMNS = {
     { label: "Cena X na AH → zysk/strata", key: "profitAh", cell: (r) => optionCell(r, "ah", r.profitAh) },
     { label: "Cena X u kupca → zysk/strata", key: "profitVendor", cell: (r) => optionCell(r, "vendor", r.profitVendor) },
     { label: "EV materiałów z rozbioru X → zysk/strata", key: "profitDisenchant", cell: (r) => optionCell(r, "disenchant", r.profitDisenchant) },
-    { label: "Najlepsza opcja", cell: (r) => td(USE_LABEL[r.use] ?? "") },
-    { label: "Zysk (najlepsza)", key: "profit", cell: profitCell },
+    { label: "Zysk (najlepsza opcja)", key: "profit", cell: (r) => {
+        const c = el("td", { className: "num " + (r.profit >= 0 ? "good" : "bad") });
+        c.append(el("div", { textContent: money(r.profit) }), el("div", { className: "dim small", textContent: `opcja: ${USE_LABEL[r.use] ?? "-"}` }));
+        return c;
+      } },
     { label: "ROI", key: "roi", cell: (r) => td(formatPct(r.roi), "num") },
+    { label: "Trend X (popyt)", key: "trendChange", cell: demandCell },
   ],
   disenchant: [
     { label: "Przedmiot", cell: (r) => td(r.name + (r.complete ? "" : "  *")) },
@@ -188,8 +202,12 @@ function dealDetail(r) {
     const v = x.valueInfo;
     if (v) parts.push(`Kupiec: ${money(v.vendor)} | AH: ${money(v.ah)} | Rozbiór: ${money(v.disenchant)}${v.deIncomplete ? " *" : ""}`);
     if (v?.deStats) parts.push(`Rozrzut EV rozbioru: ± ${money(v.deStats.sd)} (typowy zakres ${money(Math.max(0, v.deStats.ev - v.deStats.sd))} - ${money(v.deStats.ev + v.deStats.sd)})`);
-    const t = trend(state.model.items.get(x.recipe.produces) ?? []);
-    if (t) parts.push(`Trend wyrobu (7 dni): ${TREND_LABEL[t.dir]} ${formatPct(t.change)}`);
+    const d = r.demand;
+    if (d?.price) {
+      parts.push(`Trend ceny wyrobu (7 dni, ${d.points} skanów): ${TREND_LABEL[d.price.dir]} ${formatPct(d.price.change)}`);
+      if (d.qty) parts.push(`Trend liczby ofert na AH: ${TREND_LABEL[d.qty.dir]} ${formatPct(d.qty.change)}`);
+      parts.push(`Wniosek: ${d.label}`);
+    } else parts.push(`Trend wyrobu: ${d?.label ?? "brak historii"}`);
     if (x.recipe.skill) parts.push(`Umiejętność: ${x.recipe.skill}`);
     return parts.join("\n");
   }

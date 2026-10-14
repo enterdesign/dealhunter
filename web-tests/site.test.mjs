@@ -2,7 +2,7 @@
 import test from "node:test";
 import assert from "node:assert/strict";
 import { parseSavedVariables } from "../docs/js/luaparse.js";
-import { summarize, trend, netProceeds, itemValue, evaluateRecipe, rankRecipes, formatMoney, formatPct, disenchantStats, confidenceLabel } from "../docs/js/engine.js";
+import { summarize, trend, netProceeds, itemValue, evaluateRecipe, rankRecipes, formatMoney, formatPct, disenchantStats, confidenceLabel, demandSignal, fieldTrend } from "../docs/js/engine.js";
 import { loadSavedVariables, makeContext } from "../docs/js/datasource.js";
 
 // ---------- parser Lua ----------
@@ -475,4 +475,27 @@ test("materiał BoP nie jest kosztem 0: osobna lista, flaga i filtr", () => {
 test("makeContext: isBop z katalogu", () => {
   const ctx = makeContext(loadSavedVariables('DealHunterAHDB = { ["items"] = {} }'), { items: { 5: { bop: true }, 6: {} } });
   assert.equal(ctx.isBop(5), true); assert.equal(ctx.isBop(6), false); assert.equal(ctx.isBop(7), false);
+});
+
+test("sygnał popytu: cena i liczba ofert wyrobu", () => {
+  const H = (rows) => rows.map(([low, qty], i) => ({ t: 1_000_000 + i * 86400, low, qty }));
+  assert.equal(demandSignal(H([[100, 10], [100, 10]])).verdict, "unknown");                    // za mało skanów
+  assert.equal(demandSignal(H([[100, 10], [100, 10], [100, 10], [150, 6]])).verdict, "up");   // cena w górę, ofert mniej
+  assert.equal(demandSignal(H([[100, 10], [100, 10], [100, 10], [70, 20]])).verdict, "down"); // cena w dół, ofert więcej
+  assert.equal(demandSignal(H([[100, 10], [100, 10], [100, 10], [150, 20]])).verdict, "mixed");// cena w górę, ale ofert przybywa
+  assert.equal(demandSignal(H([[100, 10], [100, 10], [100, 10], [101, 5]])).verdict, "up");   // cena stabilna, ofert ubywa
+  assert.equal(demandSignal(H([[100, 10], [100, 10], [100, 10], [100, 10]])).verdict, "flat");
+  assert.equal(fieldTrend(H([[1, 10], [1, 10], [1, 20]]), "qty").dir, "up");
+  assert.equal(fieldTrend(H([[1, 10], [1, 10]]), "qty"), null);
+});
+
+test("receptura: trend gotowego wyrobu w wierszu", () => {
+  const H = [[100, 10], [100, 10], [100, 10], [150, 6]].map(([low, qty], i) => ({ t: 1_000_000 + i * 86400, low, qty }));
+  const ctx = ctxOf({ "10:low": 10, "99:median": 150 });
+  ctx.ahHistory = () => H;
+  const [row] = craftFlips([recipe(1, 99, [[10, 1]])], ctx, {});
+  assert.equal(row.demand.verdict, "up");
+  assert.ok(row.trendChange > 0.4);
+  ctx.ahHistory = () => null;
+  assert.equal(craftFlips([recipe(1, 99, [[10, 1]])], ctx, {})[0].trendChange, null);
 });
