@@ -181,7 +181,7 @@ test("loadSavedVariables: nieznany format i plik Auctionatora dają czytelny bł
 
 // ---------- okazje ----------
 import { professionIndex, matchesProfession, vendorFlips, ahFlips, disenchantFlips, craftFlips,
-  resolveWatchlist, guideInvestments, filterRows, sortRows, onlyProfitable, filterReliable, NO_PROFESSION } from "../docs/js/opportunities.js";
+  resolveWatchlist, guideInvestments, filterRows, sortRows, onlyProfitable, filterReliable, filterBop, NO_PROFESSION } from "../docs/js/opportunities.js";
 
 const mk = (entries) => ({ items: new Map(entries.map(([id, h]) => [id, h])) });
 const H = (prices, extra = {}) => prices.map((p, i) => ({ t: 1_000_000 + i * 86400, low: p, median: p, avg: p, qty: 5, ...extra }));
@@ -443,4 +443,36 @@ test("skan testowy z repo (okrojony Auctionator.lua) wczytuje się i nie zawiera
   assert.ok(m.scannedAt > 1_700_000_000);
   for (const forbidden of ["POSTING_HISTORY", "SHOPPING_LISTS", "AUCTIONATOR_CONFIG", "RECENT_SEARCHES", "SELLING_GROUPS"])
     assert.ok(!text.includes(forbidden), forbidden);
+});
+
+test("materiał BoP nie jest kosztem 0: osobna lista, flaga i filtr", () => {
+  // składnik 10 z AH (100), składnik 20 to BoP bez ceny, składnik 30 nie zeskanowany (brak ceny, ale nie BoP)
+  const ctx = ctxOf({ "10:low": 100, "99:median": 1000 });
+  ctx.isBop = (id) => id === 20;
+  const r = evaluateRecipe(recipe(1, 99, [[10, 2], [20, 1], [30, 1]]), ctx);
+  assert.deepEqual(r.bop, [20]); assert.deepEqual(r.missing, [30]);
+  assert.equal(r.cost, 200);        // BoP i brak ceny nie dodają kosztu
+  assert.equal(r.complete, false);  // brak ceny składnika 30
+  // BoP z ceną u kupca jest zwykłym składnikiem
+  const ctx2 = ctxOf({ "99:median": 1000 }, { vendorBuy: { 20: 50 } });
+  ctx2.isBop = () => true;
+  const r2 = evaluateRecipe(recipe(2, 99, [[20, 2]]), ctx2);
+  assert.deepEqual(r2.bop, []); assert.equal(r2.cost, 100);
+
+  const rows = craftFlips([recipe(1, 99, [[10, 1], [20, 1]]), recipe(2, 99, [[10, 1]])], ctx, {});
+  const byId = Object.fromEntries(rows.map((x) => [x.id, x]));
+  assert.deepEqual(byId[1].bopReagents, [20]);
+  assert.deepEqual(byId[1].ingredients.map((g) => g.source), ["AH", "BoP"]);
+  assert.equal(byId[1].ingredients[1].unit, null);
+  assert.deepEqual(filterBop(rows, "without").rows.map((x) => x.id), [2]);
+  assert.deepEqual(filterBop(rows, "only").rows.map((x) => x.id), [1]);
+  assert.equal(filterBop(rows, "all").rows.length, 2);
+  assert.equal(filterBop(rows, "without").hidden, 1);
+  // inne rodzaje wierszy nie są filtrowane
+  assert.equal(filterBop([{ kind: "ah" }], "only").rows.length, 1);
+});
+
+test("makeContext: isBop z katalogu", () => {
+  const ctx = makeContext(loadSavedVariables('DealHunterAHDB = { ["items"] = {} }'), { items: { 5: { bop: true }, 6: {} } });
+  assert.equal(ctx.isBop(5), true); assert.equal(ctx.isBop(6), false); assert.equal(ctx.isBop(7), false);
 });

@@ -1,10 +1,10 @@
-import { loadSavedVariables, makeContext, makeDisenchant, selectHouse } from "./datasource.js?v=fc4af501";
-import { kvSet, kvGet, kvDelete } from "./store.js?v=fc4af501";
-import { trend, formatMoney, formatPct, netProceeds } from "./engine.js?v=fc4af501";
+import { loadSavedVariables, makeContext, makeDisenchant, selectHouse } from "./datasource.js?v=cb1cefb6";
+import { kvSet, kvGet, kvDelete } from "./store.js?v=cb1cefb6";
+import { trend, formatMoney, formatPct, netProceeds } from "./engine.js?v=cb1cefb6";
 import {
   professionIndex, vendorFlips, craftFlips, disenchantFlips, ahFlips, resolveWatchlist, guideInvestments,
-  filterRows, sortRows, runCheck, onlyProfitable, filterReliable, NO_PROFESSION,
-} from "./opportunities.js?v=fc4af501";
+  filterRows, sortRows, runCheck, onlyProfitable, filterReliable, filterBop, NO_PROFESSION,
+} from "./opportunities.js?v=cb1cefb6";
 
 const $ = (id) => document.getElementById(id);
 const MODE = document.body.dataset.mode || "tbc";
@@ -77,7 +77,7 @@ function td(text, cls) { return el("td", { textContent: text, className: cls ?? 
 
 function ingredientsText(r) {
   return r.ingredients.map((g) =>
-    `${g.count}× ${itemName(g.item)}${g.unit == null ? " (brak ceny)" : ` @ ${money(g.unit)} ${g.source}`}`).join("; ");
+    `${g.count}× ${itemName(g.item)}${g.source === "BoP" ? " (BoP, nie do kupienia)" : g.unit == null ? " (brak ceny)" : ` @ ${money(g.unit)} ${g.source}`}`).join("; ");
 }
 // Komórka opcji: w pierwszej linii cena (AH / kupiec) albo EV materiałów (rozbiór), w drugiej zysk albo strata
 // względem kosztu składników. Najlepsza opcja jest wyróżniona.
@@ -131,9 +131,9 @@ const COLUMNS = {
   ],
   craft: [
     { label: "Wyrób (X)", cell: (r) => el("td", { className: "name" }, r.name + (r.known ? "" : "  [?]") + (r.complete ? "" : "  *"),
-        el("div", { className: "dim small", textContent: `${r.professions.join(", ")} · ofert wyrobu na AH: ${r.qty ?? "-"}` })) },
+        el("div", { className: "dim small", textContent: `${r.professions.join(", ")} · ofert wyrobu na AH: ${r.qty ?? "-"}${r.bopReagents?.length ? " · wymaga materiałów BoP" : ""}` })) },
     { label: "Składniki (Y, Z)", cell: (r) => el("td", { className: "wrap dim", textContent: ingredientsText(r) }) },
-    { label: "Koszt składników", key: "cost", cell: (r) => td(money(r.cost), "num") },
+    { label: "Koszt składników", key: "cost", cell: (r) => td(money(r.cost) + (r.bopReagents?.length ? " + BoP" : ""), "num" + (r.bopReagents?.length ? " warn" : "")) },
     { label: "Cena X na AH → zysk/strata", key: "profitAh", cell: (r) => optionCell(r, "ah", r.profitAh) },
     { label: "Cena X u kupca → zysk/strata", key: "profitVendor", cell: (r) => optionCell(r, "vendor", r.profitVendor) },
     { label: "EV materiałów z rozbioru X → zysk/strata", key: "profitDisenchant", cell: (r) => optionCell(r, "disenchant", r.profitDisenchant) },
@@ -184,6 +184,7 @@ function dealDetail(r) {
     };
     const parts = [`Składniki: ${x.recipe.reagents.map(reagent).join(", ")}`];
     if (x.missing.length) parts.push(`Brak ceny: ${x.missing.map(itemName).join(", ")}`);
+    if (x.bop.length) parts.push(`Materiały BoP (nie do kupienia, nie wliczone w koszt): ${x.bop.map(itemName).join(", ")}. Zysk to tylko górne oszacowanie.`);
     const v = x.valueInfo;
     if (v) parts.push(`Kupiec: ${money(v.vendor)} | AH: ${money(v.ah)} | Rozbiór: ${money(v.disenchant)}${v.deIncomplete ? " *" : ""}`);
     if (v?.deStats) parts.push(`Rozrzut EV rozbioru: ± ${money(v.deStats.sd)} (typowy zakres ${money(Math.max(0, v.deStats.ev - v.deStats.sd))} - ${money(v.deStats.ev + v.deStats.sd)})`);
@@ -244,7 +245,7 @@ function renderDeals() {
   renderKindChips();
   const kind = DEAL_KINDS.find((k) => k.id === state.deal);
   $("dealHelp").textContent = kind.help;
-  $("optKnown").hidden = $("optIncomplete").hidden = $("optQty").hidden = state.deal !== "craft";
+  $("optKnown").hidden = $("optBop").hidden = $("optIncomplete").hidden = $("optQty").hidden = state.deal !== "craft";
   $("optRoi").hidden = state.deal === "vendor";
   document.querySelectorAll("#sortbar button").forEach((b) => {
     const active = b.dataset.sort === state.sortBy;
@@ -271,11 +272,14 @@ function renderDeals() {
   if (state.deal === "guide" && !state.watch.length) { empty.textContent = "Brak listy przedmiotów z guidów."; return; }
 
   let rows = filterRows(state.deals[state.deal] ?? [], state.profession);
+  const bopFiltered = state.deal === "craft" ? filterBop(rows, $("bopFilter").value) : { rows, hidden: 0 };
+  rows = bopFiltered.rows;
   const reliable = filterReliable(rows, { minQty: Number($("minQty").value) || 0, maxRoi: Number($("maxRoi").value) || 0 });
   rows = reliable.rows;
   if ($("hideLoss").checked) rows = onlyProfitable(rows);
   rows = sortRows(rows, state.sortBy, state.sortDir);
-  const hiddenNote = reliable.hidden ? ` Ukryto ${reliable.hidden} niewiarygodnych (mało ofert albo podejrzanie wysokie ROI).` : "";
+  const bopNote = bopFiltered.hidden ? ` Ukryto ${bopFiltered.hidden} receptur z materiałami BoP (filtr "materiały BoP").` : "";
+  const hiddenNote = bopNote + (reliable.hidden ? ` Ukryto ${reliable.hidden} niewiarygodnych (mało ofert albo podejrzanie wysokie ROI).` : "");
   empty.textContent = rows.length ? `Pokazano ${Math.min(rows.length, 300)} z ${rows.length}.${hiddenNote}`
     : `Brak wyników dla tych filtrów (spróbuj zmienić profesję, dodać skany lub poluzować progi).${hiddenNote}`;
   for (const r of rows.slice(0, 300)) {
@@ -460,6 +464,7 @@ function wire() {
     $(id).addEventListener("change", () => refresh());
   $("hideLoss").addEventListener("change", renderDeals);
   $("minQty").addEventListener("change", renderDeals);
+  $("bopFilter").addEventListener("change", renderDeals);
   $("maxRoi").addEventListener("change", renderDeals);
   $("itemFilter").addEventListener("input", (e) => { state.itemFilter = e.target.value; renderItems(); });
   $("clear").addEventListener("click", () => {

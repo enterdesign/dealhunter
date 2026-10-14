@@ -60,6 +60,8 @@
         <button type="button" data-sort="roi">ROI</button>
       </span>
       <label id="optKnown"><input type="checkbox" id="knownOnly"> tylko znane</label>
+      <label id="optBop" title="Materiał BoP nie jest sprzedawany na AH, więc nie ma ceny. Koszt takiej receptury nie zawiera go (nie jest liczony jako 0), a zysk to tylko górne oszacowanie.">materiały BoP
+        <select id="bopFilter"><option value="without">bez receptur z BoP</option><option value="all">wszystkie</option><option value="only">tylko z BoP</option></select></label>
       <label id="optIncomplete"><input type="checkbox" id="hideIncomplete"> ukryj niekompletne</label>
       <label id="optQty" title="Wyroby sprzedawane na AH, których jest mniej ofert, są pomijane (jedna absurdalna cena zawyża zysk). 0 = pokaż wszystkie.">min. ofert wyrobu na AH <input type="number" id="minQty" min="0" max="999" step="1" value="3"></label>
       <label id="optRoi" title="Zysk z ceny z AH powyżej tego ROI zwykle oznacza pojedynczą absurdalną ofertę, a nie realny rynek. 0 = pokaż wszystko.">ukryj podejrzane: ROI powyżej <input type="number" id="maxRoi" min="0" max="100000" step="100" value="500"> %</label>
@@ -112,6 +114,6 @@
   </section>
 </main>
 
-<script type="module" src="../js/app.js?v=fc4af501"></script>
+<script type="module" src="../js/app.js?v=cb1cefb6"></script>
 </body>
 </html>

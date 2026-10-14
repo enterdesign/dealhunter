@@ -1,7 +1,7 @@
 // Wyszukiwanie okazji na podstawie skanu AH. Wszystkie ceny w miedzi, wszystkie funkcje czyste (testowalne).
 //
 // model: { items: Map(id -> history[]) }   catalog: { items: {id: {name, vendorSell, bop, ...}} }
-import { trend, netProceeds, rankRecipes, disenchantStats, confidenceLabel, pricePoint } from "./engine.js?v=fc4af501";
+import { trend, netProceeds, rankRecipes, disenchantStats, confidenceLabel, pricePoint } from "./engine.js?v=cb1cefb6";
 
 export const NO_PROFESSION = "__none";
 
@@ -56,12 +56,13 @@ export function craftFlips(recipes, ctx, opts = {}) {
     const ingredients = r.recipe.reagents.map((g) => {
       const vb = ctx.vendorBuy?.(g.item);
       const unit = vb != null ? vb : ctx.ahPrice(g.item, buyMode);
-      return { item: g.item, count: g.count, unit, source: vb != null ? "kupiec" : unit != null ? "AH" : null };
+      const isBop = vb == null && !!ctx.isBop?.(g.item);
+      return { item: g.item, count: g.count, unit: isBop ? null : unit, source: vb != null ? "kupiec" : isBop ? "BoP" : unit != null ? "AH" : null };
     });
     return row({
       kind: "craft", id: r.recipe.id, name: r.recipe.name, cost: r.cost, value: r.value, profit: r.profit,
       use: r.use, known: r.known, complete: r.complete, professions: [r.recipe.profession], result: r,
-      qty: ctx.ahQty?.(r.recipe.produces) ?? null, ingredients,
+      qty: ctx.ahQty?.(r.recipe.produces) ?? null, ingredients, bopReagents: r.bop,
       options: { ah: times(vi.ah), vendor: times(vi.vendor), disenchant: times(vi.disenchant) },
       // zysk albo strata dla każdej opcji osobno (wartość opcji − koszt składników)
       profitAh: vi.ah == null ? null : times(vi.ah) - r.cost,
@@ -189,4 +190,13 @@ export function filterReliable(rows, { minQty = 0, maxRoi = 0 } = {}) {
     return true;
   });
   return { rows: kept, hidden };
+}
+
+// Filtr receptur wg materiałów BoP: "without" = tylko receptury bez BoP, "only" = tylko z BoP, "all" = wszystkie.
+// Koszt receptury z BoP nie zawiera tych materiałów (nie da się ich kupić), więc zysk jest tylko górnym szacunkiem.
+export function filterBop(rows, mode = "without") {
+  if (mode === "all") return { rows, hidden: 0 };
+  const has = (r) => (r.bopReagents?.length ?? 0) > 0;
+  const kept = rows.filter((r) => r.kind !== "craft" || (mode === "only" ? has(r) : !has(r)));
+  return { rows: kept, hidden: rows.length - kept.length };
 }
