@@ -81,14 +81,16 @@ export function itemValue(itemId, ctx, { sellMode = "median", fee = FEE_DEFAULTS
 export function evaluateRecipe(recipe, ctx, opts = {}) {
   const buyMode = opts.buyMode ?? "low";
   let cost = 0;
-  const missing = [];
+  const missing = []; // składniki bez ceny (nie zeskanowane / brak ofert na AH)
+  const bop = [];     // składniki BoP: nie da się ich kupić na AH, więc nie mają ceny (nie są kosztem 0)
   for (const r of recipe.reagents) {
     // składnik sprzedawany przez kupca zawsze liczymy po cenie kupca (ma nieograniczony zapas), nie z AH
     const vb = ctx.vendorBuy?.(r.item);
+    if (vb == null && ctx.isBop?.(r.item)) { bop.push(r.item); continue; }
     const unit = vb != null ? vb : ctx.ahPrice(r.item, buyMode);
     if (unit != null) cost += unit * r.count; else missing.push(r.item);
   }
-  const res = { recipe, cost, missing };
+  const res = { recipe, cost, missing, bop };
   const val = itemValue(recipe.produces, ctx, opts);
   if (val) {
     res.valueInfo = val;
