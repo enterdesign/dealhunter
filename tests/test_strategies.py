@@ -3,12 +3,16 @@ import json
 import pathlib
 import unittest
 
-DATA = pathlib.Path(__file__).resolve().parent.parent / "docs" / "data" / "tbc"
+ROOT = pathlib.Path(__file__).resolve().parent.parent / "docs" / "data"
+DATA = ROOT / "tbc"
 
 
 class StrategyDataTests(unittest.TestCase):
+    MODE = "tbc"
+
     @classmethod
     def setUpClass(cls):
+        DATA = ROOT / cls.MODE
         cls.strategies = json.loads((DATA / "strategies.json").read_text(encoding="utf-8"))["strategies"]
         items = json.loads((DATA / "items.json").read_text(encoding="utf-8"))["items"]
         cls.names = {v["name"] for v in items.values()}
@@ -42,7 +46,13 @@ class StrategyDataTests(unittest.TestCase):
         covered = {s["profession"] for s in self.strategies}
         for p in ("Tailoring", "Alchemy", "Jewelcrafting", "Enchanting", "Mining", "Herbalism", "Skinning",
                   "Leatherworking", "Blacksmithing", "Engineering"):
+            if p == "Jewelcrafting" and self.MODE == "forever":
+                continue   # w Forever nie ma Jewelcrafting
             self.assertIn(p, covered)
+
+
+class ForeverStrategyDataTests(StrategyDataTests):
+    MODE = "forever"
 
 
 if __name__ == "__main__":

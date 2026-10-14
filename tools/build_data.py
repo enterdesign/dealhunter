@@ -70,6 +70,8 @@ def build(raw, out, build_name=""):
         product, qty = creates[spell]
         if product not in items or not reagents.get(spell):
             continue
+        if any(g["item"] not in items for g in reagents[spell]):
+            continue   # składnik spoza katalogu (np. przedmiot testowy lub z innej wersji gry)
         seen.add((line, spell))
         recipes.append({
             "id": spell, "name": items[product]["name"], "profession": PROFESSIONS[line],

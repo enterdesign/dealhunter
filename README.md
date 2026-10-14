@@ -49,8 +49,11 @@ Addon obsługuje trzy interfejsy aukcji: klasyczny (TBC, Classic Era), "replicat
 Po zmianach w `addon/` uruchom `python3 tools/pack_addon.py`.
 
 ## Tryby gry
-Strona główna (`docs/index.html`) wybiera tryb. Dostępny: **TBC Anniversary** (`docs/tbc/`, dane w `docs/data/tbc/`).
-**WoW Forever** dojdzie jako drugi tryb (`docs/forever/`, `docs/data/forever/`) po premierze gry.
+Strona główna (`docs/index.html`) wybiera tryb. Dostępne tryby: **TBC Anniversary** (`docs/tbc/`, dane w `docs/data/tbc/`) i **WoW Forever** (`docs/forever/`,
+dane w `docs/data/forever/`). Oba mają te same funkcje (ten sam kod w `docs/js/`); różnią się tylko danymi.
+Dane Forever powstają z tabel DB2 builda `wowf` (`python3 tools/fetch_wago.py --product wowf`, potem `build_data.py`,
+`build_disenchant.py`, `build_vendors.py` z `WOWHEAD_GAME=classic` i własnym cache, na końcu `build_strategies_forever.py`).
+Dane rozbioru i kupców Forever pochodzą z bazy Wowheada "classic", więc mogą nieznacznie odbiegać od Forever.
 
 ## Struktura
 - `docs/` - strona (statyczna, bez zależności). Źródło dla GitHub Pages: gałąź domyślna, folder `/docs`.
