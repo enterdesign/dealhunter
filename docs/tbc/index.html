@@ -1,0 +1,99 @@
+<!doctype html>
+<html lang="pl">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="robots" content="noindex, nofollow">
+<title>DealHunter AH - TBC Anniversary</title>
+<link rel="icon" href="data:,">
+<link rel="stylesheet" href="../style.css">
+</head>
+<body data-mode="tbc">
+<header>
+  <p class="crumb"><a href="../">&larr; Wybór trybu</a></p>
+  <h1>DealHunter AH <span class="tag">TBC Anniversary</span></h1>
+  <p class="sub">Okazje z Twojego skanu AH. Dane liczone lokalnie w przeglądarce.</p>
+</header>
+
+<main>
+  <section class="card" id="data">
+    <h2>Skan AH</h2>
+    <label class="drop" id="drop">
+      <input type="file" id="file" accept=".lua" hidden>
+      <strong>Przeciągnij plik SavedVariables tutaj</strong> albo kliknij, żeby wybrać
+      <span class="hint">np. <code>WTF/Account/…/SavedVariables/DealHunterAH.lua</code> (po <code>/reload</code> w grze)</span>
+    </label>
+    <ul class="status" id="status"></ul>
+  </section>
+
+  <nav class="tabs" role="tablist">
+    <button role="tab" data-tab="deals" aria-selected="true">Okazje</button>
+    <button role="tab" data-tab="strategies" aria-selected="false">Strategie</button>
+    <button role="tab" data-tab="items" aria-selected="false">Przedmioty</button>
+    <button role="tab" data-tab="settings" aria-selected="false">Ustawienia</button>
+  </nav>
+
+  <section class="card tab" id="tab-deals">
+    <div class="chips" id="dealKinds" role="tablist" aria-label="Rodzaj okazji"></div>
+    <p class="hint" id="dealHelp"></p>
+    <div class="toolbar">
+      <select id="profession" aria-label="Profesja"></select>
+      <span class="sortbar" id="sortbar" role="group" aria-label="Sortowanie">
+        <button type="button" data-sort="profit">Zysk</button>
+        <button type="button" data-sort="cost">Koszt</button>
+        <button type="button" data-sort="roi">ROI</button>
+      </span>
+      <label id="optKnown"><input type="checkbox" id="knownOnly"> tylko znane</label>
+      <label id="optIncomplete"><input type="checkbox" id="incomplete"> niekompletne</label>
+      <label id="optDiscount">min. zniżka <input type="number" id="minDiscount" min="0" max="90" step="5" value="10"> %</label>
+    </div>
+    <div class="scroll"><table id="dealTable"><thead></thead><tbody></tbody></table></div>
+    <p class="empty" id="dealsEmpty"></p>
+  </section>
+
+  <section class="card tab" id="tab-strategies" hidden>
+    <div class="toolbar">
+      <select id="stratProfession" aria-label="Profesja strategii"></select>
+    </div>
+    <div id="strategyList"></div>
+    <p class="empty" id="strategiesEmpty"></p>
+  </section>
+
+  <section class="card tab" id="tab-items" hidden>
+    <div class="toolbar">
+      <input type="search" id="itemFilter" placeholder="Szukaj po nazwie lub ID" aria-label="Szukaj przedmiotu">
+    </div>
+    <div class="scroll"><table id="itemTable">
+      <thead><tr>
+        <th>Przedmiot</th>
+        <th class="num">Najniższa</th>
+        <th class="num">Mediana</th>
+        <th class="num">Średnia</th>
+        <th class="num">Ilość</th>
+        <th>Trend 7d</th>
+      </tr></thead>
+      <tbody></tbody>
+    </table></div>
+    <p class="empty" id="itemsEmpty"></p>
+  </section>
+
+  <section class="card tab" id="tab-settings" hidden>
+    <div class="form">
+      <label>Sprzedaż po cenie
+        <select id="sellMode"><option value="median">mediana</option><option value="low">najniższa</option><option value="avg">średnia</option></select>
+      </label>
+      <label>Zakup po cenie
+        <select id="buyMode"><option value="low">najniższa</option><option value="median">mediana</option><option value="avg">średnia</option></select>
+      </label>
+      <label class="inline"><input type="checkbox" id="feeEnabled"> Uwzględnij prowizję AH
+        <input type="number" id="feeCut" min="0" max="100" step="1" value="5"> %
+      </label>
+      <p class="hint">Prowizja i depozyt są domyślnie wyłączone.</p>
+      <button type="button" id="clear">Usuń zapamiętane dane z tej przeglądarki</button>
+    </div>
+  </section>
+</main>
+
+<script type="module" src="../js/app.js"></script>
+</body>
+</html>

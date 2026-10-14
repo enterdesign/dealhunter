@@ -1,0 +1,1262 @@
+{
+ "updated": "2026-10-14",
+ "strategies": [
+  {
+   "id": "przeglad-profesji",
+   "profession": "Ogólne",
+   "tier": null,
+   "title": "Które profesje zarabiają najlepiej",
+   "summary": "Wowhead dzieli profesje na trzy poziomy opłacalności. Im wyższy poziom, tym stabilniej sprzedają się wyroby i tym mniej trzeba rzadkich receptur.",
+   "points": [
+    "S (najlepsze): Tailoring, Alchemy, Jewelcrafting, Enchanting.",
+    "A (pewne, ale mniej): Mining, Herbalism.",
+    "B (tylko z rzadkimi recepturami albo w pierwszej fazie): Skinning, Leatherworking, Blacksmithing, Engineering.",
+    "Ceny zależą od serwera, więc ten ranking to punkt wyjścia - sprawdź go na własnych skanach (zakładka Okazje)."
+   ],
+   "sources": [
+    {
+     "title": "Wowhead: Burning Crusade Classic Gold Making With Professions Overview",
+     "url": "https://www.wowhead.com/tbc/guide/best-professions-how-to-make-gold-burning-crusade-classic",
+     "reliability": "wysoka",
+     "note": "przeczytany w całości; strona podaje aktualizację 2025-11-30"
+    }
+   ]
+  },
+  {
+   "id": "ceny-na-serwerze",
+   "profession": "Ogólne",
+   "tier": null,
+   "title": "Sprawdzaj ceny na własnym serwerze",
+   "summary": "Każda lista \"co się opłaca\" jest uśredniona. Ekonomia serwera potrafi ją odwrócić, więc decyzję podejmuj po własnym skanie AH.",
+   "points": [
+    "Zrób skan AH przed zakupem materiałów.",
+    "Porównuj zysk z receptur i flipów w zakładce Okazje.",
+    "Zwracaj uwagę na przedmioty BoP - nie da się ich sprzedać na AH."
+   ],
+   "sources": [
+    {
+     "title": "Wowhead: Burning Crusade Classic Gold Making With Professions Overview",
+     "url": "https://www.wowhead.com/tbc/guide/best-professions-how-to-make-gold-burning-crusade-classic",
+     "reliability": "wysoka",
+     "note": "przeczytany w całości; strona podaje aktualizację 2025-11-30"
+    },
+    {
+     "title": "PC Gamer: How to make gold in WoW Burning Crusade Classic",
+     "url": "https://pcgamer.com/wow-tbc-classic-gold-farming-guide",
+     "reliability": "średnia",
+     "note": "tylko streszczenie z wyszukiwarki"
+    }
+   ]
+  },
+  {
+   "id": "flipy-ah",
+   "profession": "Ogólne",
+   "tier": null,
+   "title": "Flipy na AH: kupuj poniżej typowej ceny",
+   "summary": "Podstawowa zasada: kup przedmiot taniej niż zwykle i sprzedaj w normalnej cenie. Strona porównuje aktualną najniższą cenę z historią Twoich skanów.",
+   "points": [
+    "Kupuj, gdy najniższa cena jest wyraźnie poniżej mediany z historii (tryb \"Flipy AH\").",
+    "Jeden z poradników mierzy w ok. 15-20 golda zysku na jednym flipie po odjęciu prowizji AH (źródło o niskiej wiarygodności).",
+    "Zwracaj uwagę na trend: spadająca cena może oznaczać, że \"okazja\" dalej tanieje."
+   ],
+   "sources": [
+    {
+     "title": "PC Gamer: How to make gold in WoW Burning Crusade Classic",
+     "url": "https://pcgamer.com/wow-tbc-classic-gold-farming-guide",
+     "reliability": "średnia",
+     "note": "tylko streszczenie z wyszukiwarki"
+    },
+    {
+     "title": "axenthost: WoW TBC tailoring money making guide",
+     "url": "https://axenthost.com/blog/wow-tbc-tailoring-money-making-guide/",
+     "reliability": "niska",
+     "note": "blog sprzedawcy golda; tylko streszczenie z wyszukiwarki"
+    }
+   ]
+  },
+  {
+   "id": "cykl-tygodniowy",
+   "profession": "Ogólne",
+   "tier": null,
+   "title": "Cykl tygodniowy: mikstury i flaski tanieją w weekend",
+   "summary": "Jeden z poradników opisuje, że materiały do rajdów (mikstury, flaski) są tańsze w weekend, a po wtorkowym resecie rajdów popyt rośnie. Możesz to sprawdzić na własnej historii cen.",
+   "points": [
+    "Kupuj konsumpcje w weekend i sprzedawaj po resecie rajdów.",
+    "Zbierz kilka skanów z różnych dni tygodnia, żeby zobaczyć, czy ten wzorzec występuje na Twoim serwerze.",
+    "To twierdzenie pochodzi z przedruku poradnika (niska wiarygodność) - traktuj jako hipotezę do sprawdzenia."
+   ],
+   "items": [
+    {
+     "name": "Flask of Pure Death",
+     "value": "średnia"
+    },
+    {
+     "name": "Flask of Relentless Assault",
+     "value": "średnia"
+    },
+    {
+     "name": "Flask of Distilled Wisdom",
+     "value": "średnia"
+    },
+    {
+     "name": "Flask of Supreme Power",
+     "value": "średnia"
+    },
+    {
+     "name": "Destruction Potion",
+     "value": "średnia"
+    },
+    {
+     "name": "Haste Potion",
+     "value": "średnia"
+    }
+   ],
+   "sources": [
+    {
+     "title": "PC Gamer: How to make gold in WoW Burning Crusade Classic",
+     "url": "https://pcgamer.com/wow-tbc-classic-gold-farming-guide",
+     "reliability": "średnia",
+     "note": "tylko streszczenie z wyszukiwarki"
+    }
+   ]
+  },
+  {
+   "id": "farmienie-popytu",
+   "profession": "Ogólne",
+   "tier": null,
+   "title": "Farmienie przedmiotów o stałym popycie (Primale, reputacje)",
+   "summary": "Niektóre materiały sprzedają się zawsze, bo są potrzebne do wielu receptur albo do zdobywania reputacji.",
+   "points": [
+    "Primale (Mana, Shadow, Fire, Air, Water) mają wysoką wartość i są wymagane w wielu wysokich recepturach.",
+    "Arcane Tome (Scryers) i Fel Armament (Aldor) dają po 350 reputacji za oddanie, więc mają stały popyt.",
+    "Wowhead ma osobne poradniki do farmienia Primali i przedmiotów do reputacji."
+   ],
+   "items": [
+    {
+     "name": "Primal Mana",
+     "value": "wysoka"
+    },
+    {
+     "name": "Primal Shadow",
+     "value": "wysoka"
+    },
+    {
+     "name": "Primal Fire",
+     "value": "wysoka"
+    },
+    {
+     "name": "Primal Air",
+     "value": "wysoka"
+    },
+    {
+     "name": "Primal Water",
+     "value": "wysoka"
+    },
+    {
+     "name": "Arcane Tome",
+     "value": "średnia"
+    },
+    {
+     "name": "Fel Armament",
+     "value": "średnia"
+    },
+    {
+     "name": "Sunfury Signet",
+     "value": "niska"
+    },
+    {
+     "name": "Mark of Sargeras",
+     "value": "niska"
+    },
+    {
+     "name": "Coilfang Armaments",
+     "value": "niska"
+    },
+    {
+     "name": "Primal Life",
+     "value": "niska"
+    },
+    {
+     "name": "Primal Earth",
+     "value": "niska"
+    },
+    {
+     "name": "Sanguine Hibiscus",
+     "value": "niska"
+    },
+    {
+     "name": "Arakkoa Feather",
+     "value": "niska"
+    },
+    {
+     "name": "Oshu'gun Crystal Fragment",
+     "value": "niska"
+    },
+    {
+     "name": "Pair of Ivory Tusks",
+     "value": "niska"
+    }
+   ],
+   "sources": [
+    {
+     "title": "Wowhead: Burning Crusade Classic Gold Making With Professions Overview",
+     "url": "https://www.wowhead.com/tbc/guide/best-professions-how-to-make-gold-burning-crusade-classic",
+     "reliability": "wysoka",
+     "note": "przeczytany w całości; strona podaje aktualizację 2025-11-30"
+    },
+    {
+     "title": "Wowhead: Gold Making (TBC Classic)",
+     "url": "https://www.wowhead.com/tbc/guides/gold-making",
+     "reliability": "średnia",
+     "note": "tylko spis treści z wyników wyszukiwania"
+    }
+   ]
+  },
+  {
+   "id": "tailoring",
+   "profession": "Tailoring",
+   "tier": "S",
+   "title": "Tailoring: pancerze BiS, spellthready i duże torby",
+   "summary": "Jedna z najlepszych profesji w TBC: daje mocny ekwipunek dla większości klas casterów oraz torby i spellthready potrzebne przez cały dodatek.",
+   "points": [
+    "Największą wartość mają przedmioty BiS pierwszej fazy: Vengeance Wrap, Spellstrike Hood i Pants, Whitemend Hood i Pants, Girdle of Ruination.",
+    "Runic i Golden Spellthread (nogawki) oraz Primal Mooncloth Bag (największa torba) mają wysoką wartość przez cały dodatek.",
+    "Shadowcloth wymaga cooldownu 3 dni i 20 godzin - wartość średnia.",
+    "Netherweave Bag jest tania i łatwa; jeden z poradników opisuje masową produkcję (kup tkaniny w weekend, sprzedaj w tygodniu) z marżą rzędu 1-3 golda na torbę - niska wiarygodność źródła."
+   ],
+   "items": [
+    {
+     "name": "Vengeance Wrap",
+     "value": "bardzo wysoka"
+    },
+    {
+     "name": "Spellstrike Hood",
+     "value": "bardzo wysoka"
+    },
+    {
+     "name": "Whitemend Hood",
+     "value": "bardzo wysoka"
+    },
+    {
+     "name": "Spellstrike Pants",
+     "value": "bardzo wysoka"
+    },
+    {
+     "name": "Whitemend Pants",
+     "value": "bardzo wysoka"
+    },
+    {
+     "name": "Girdle of Ruination",
+     "value": "bardzo wysoka"
+    },
+    {
+     "name": "Unyielding Girdle",
+     "value": "wysoka"
+    },
+    {
+     "name": "Battlecast Hood",
+     "value": "wysoka"
+    },
+    {
+     "name": "Battlecast Pants",
+     "value": "wysoka"
+    },
+    {
+     "name": "Runic Spellthread",
+     "value": "wysoka"
+    },
+    {
+     "name": "Golden Spellthread",
+     "value": "wysoka"
+    },
+    {
+     "name": "Primal Mooncloth Bag",
+     "value": "wysoka"
+    },
+    {
+     "name": "Shadowcloth",
+     "value": "średnia"
+    },
+    {
+     "name": "Spellcloth",
+     "value": "średnia"
+    },
+    {
+     "name": "Primal Mooncloth",
+     "value": "średnia"
+    },
+    {
+     "name": "Unyielding Bracers",
+     "value": "średnia"
+    },
+    {
+     "name": "Cloak of Eternity",
+     "value": "średnia"
+    },
+    {
+     "name": "White Remedy Cape",
+     "value": "średnia"
+    },
+    {
+     "name": "Cloak of the Black Void",
+     "value": "średnia"
+    },
+    {
+     "name": "Imbued Netherweave Bag",
+     "value": "niska"
+    },
+    {
+     "name": "Netherweave Bag",
+     "value": "niska"
+    }
+   ],
+   "check": {
+    "type": "topRecipes",
+    "profession": "Tailoring"
+   },
+   "sources": [
+    {
+     "title": "Wowhead: Burning Crusade Classic Gold Making With Professions Overview",
+     "url": "https://www.wowhead.com/tbc/guide/best-professions-how-to-make-gold-burning-crusade-classic",
+     "reliability": "wysoka",
+     "note": "przeczytany w całości; strona podaje aktualizację 2025-11-30"
+    },
+    {
+     "title": "axenthost: WoW TBC tailoring money making guide",
+     "url": "https://axenthost.com/blog/wow-tbc-tailoring-money-making-guide/",
+     "reliability": "niska",
+     "note": "blog sprzedawcy golda; tylko streszczenie z wyszukiwarki"
+    }
+   ]
+  },
+  {
+   "id": "alchemy",
+   "profession": "Alchemy",
+   "tier": "S",
+   "title": "Alchemy: flaski, mikstury i transmutacje",
+   "summary": "Konsumpcje są potrzebne przez cały dodatek, a transmutacje dostarczają reagentów do wielu wysokich receptur.",
+   "points": [
+    "Transmutacje z cooldownem 20 godzin: Primal Might, Earthstorm Diamond i Skyfire Diamond - wysoka wartość.",
+    "Flaski (Pure Death, Relentless Assault, Distilled Wisdom, Supreme Power, ...) i mikstury (Destruction, Haste, Insane Strength) mają średnią wartość.",
+    "Mercurial Stone jest potrzebny jubilerom do Mercurial Adamantite.",
+    "Możesz sprzedawać swój cooldown transmutacji innym graczom za gold (usługa).",
+    "Specjalizacje alchemiczne dają szansę na dodatkowy wyrób przy tworzeniu."
+   ],
+   "items": [
+    {
+     "name": "Primal Might",
+     "value": "wysoka"
+    },
+    {
+     "name": "Earthstorm Diamond",
+     "value": "wysoka"
+    },
+    {
+     "name": "Skyfire Diamond",
+     "value": "wysoka"
+    },
+    {
+     "name": "Flask of Pure Death",
+     "value": "średnia"
+    },
+    {
+     "name": "Flask of Relentless Assault",
+     "value": "średnia"
+    },
+    {
+     "name": "Flask of Fortification",
+     "value": "średnia"
+    },
+    {
+     "name": "Flask of Chromatic Wonder",
+     "value": "średnia"
+    },
+    {
+     "name": "Flask of Blinding Light",
+     "value": "średnia"
+    },
+    {
+     "name": "Flask of Distilled Wisdom",
+     "value": "średnia"
+    },
+    {
+     "name": "Flask of Mighty Restoration",
+     "value": "średnia"
+    },
+    {
+     "name": "Flask of Supreme Power",
+     "value": "średnia"
+    },
+    {
+     "name": "Destruction Potion",
+     "value": "średnia"
+    },
+    {
+     "name": "Insane Strength Potion",
+     "value": "średnia"
+    },
+    {
+     "name": "Haste Potion",
+     "value": "średnia"
+    },
+    {
+     "name": "Mercurial Stone",
+     "value": "średnia"
+    },
+    {
+     "name": "Ironshield Potion",
+     "value": "niska"
+    },
+    {
+     "name": "Elixir of Empowerment",
+     "value": "niska"
+    },
+    {
+     "name": "Elixir of Major Mageblood",
+     "value": "niska"
+    },
+    {
+     "name": "Elixir of Major Shadow Power",
+     "value": "niska"
+    },
+    {
+     "name": "Elixir of Major Defense",
+     "value": "niska"
+    },
+    {
+     "name": "Fel Strength Elixir",
+     "value": "niska"
+    },
+    {
+     "name": "Elixir of Major Agility",
+     "value": "niska"
+    },
+    {
+     "name": "Elixir of Draenic Wisdom",
+     "value": "niska"
+    },
+    {
+     "name": "Elixir of Major Firepower",
+     "value": "niska"
+    },
+    {
+     "name": "Elixir of Major Frost Power",
+     "value": "niska"
+    },
+    {
+     "name": "Earthen Elixir",
+     "value": "niska"
+    },
+    {
+     "name": "Elixir of Major Fortitude",
+     "value": "niska"
+    },
+    {
+     "name": "Elixir of Major Strength",
+     "value": "niska"
+    }
+   ],
+   "check": {
+    "type": "topRecipes",
+    "profession": "Alchemy"
+   },
+   "sources": [
+    {
+     "title": "Wowhead: Burning Crusade Classic Gold Making With Professions Overview",
+     "url": "https://www.wowhead.com/tbc/guide/best-professions-how-to-make-gold-burning-crusade-classic",
+     "reliability": "wysoka",
+     "note": "przeczytany w całości; strona podaje aktualizację 2025-11-30"
+    },
+    {
+     "title": "PC Gamer: How to make gold in WoW Burning Crusade Classic",
+     "url": "https://pcgamer.com/wow-tbc-classic-gold-farming-guide",
+     "reliability": "średnia",
+     "note": "tylko streszczenie z wyszukiwarki"
+    }
+   ]
+  },
+  {
+   "id": "jewelcrafting",
+   "profession": "Jewelcrafting",
+   "tier": "S",
+   "title": "Jewelcrafting: szlify gemów, meta gemy i biżuteria",
+   "summary": "Gemy są potrzebne przez cały dodatek, zwłaszcza w pierwszych fazach, zanim pojawią się gemy epickie. Jubiler szlifuje gemy i przerabia rudę (prospecting).",
+   "points": [
+    "Meta gemy (Chaotic Skyfire, Relentless/Tenacious/Powerful/Bracing/Insightful Earthstorm Diamond) i szlify Living Ruby (Teardrop, Delicate, Runed, Bold) mają wysoką wartość.",
+    "Chain of the Twilight Owl i Eye of the Night to wysoko cenione przedmioty pre-raidowe.",
+    "Szlify Dawnstone i Noble Topaz mają średnią wartość, a Nightseye i Talasite niską.",
+    "Surowa ruda jest często warta więcej niż sztabki, bo jubilerzy ją przerabiają - uwzględnij to, zanim przetopisz."
+   ],
+   "items": [
+    {
+     "name": "Chaotic Skyfire Diamond",
+     "value": "wysoka"
+    },
+    {
+     "name": "Relentless Earthstorm Diamond",
+     "value": "wysoka"
+    },
+    {
+     "name": "Tenacious Earthstorm Diamond",
+     "value": "wysoka"
+    },
+    {
+     "name": "Powerful Earthstorm Diamond",
+     "value": "wysoka"
+    },
+    {
+     "name": "Bracing Earthstorm Diamond",
+     "value": "wysoka"
+    },
+    {
+     "name": "Insightful Earthstorm Diamond",
+     "value": "wysoka"
+    },
+    {
+     "name": "Mystical Skyfire Diamond",
+     "value": "wysoka"
+    },
+    {
+     "name": "Enigmatic Skyfire Diamond",
+     "value": "wysoka"
+    },
+    {
+     "name": "Teardrop Living Ruby",
+     "value": "wysoka"
+    },
+    {
+     "name": "Delicate Living Ruby",
+     "value": "wysoka"
+    },
+    {
+     "name": "Runed Living Ruby",
+     "value": "wysoka"
+    },
+    {
+     "name": "Bold Living Ruby",
+     "value": "wysoka"
+    },
+    {
+     "name": "Chain of the Twilight Owl",
+     "value": "wysoka"
+    },
+    {
+     "name": "Eye of the Night",
+     "value": "wysoka"
+    },
+    {
+     "name": "Solid Star of Elune",
+     "value": "średnia"
+    },
+    {
+     "name": "Rigid Dawnstone",
+     "value": "średnia"
+    },
+    {
+     "name": "Great Dawnstone",
+     "value": "średnia"
+    },
+    {
+     "name": "Thick Dawnstone",
+     "value": "średnia"
+    },
+    {
+     "name": "Smooth Dawnstone",
+     "value": "średnia"
+    },
+    {
+     "name": "Gleaming Dawnstone",
+     "value": "średnia"
+    },
+    {
+     "name": "Veiled Noble Topaz",
+     "value": "średnia"
+    },
+    {
+     "name": "Luminous Noble Topaz",
+     "value": "średnia"
+    },
+    {
+     "name": "Inscribed Noble Topaz",
+     "value": "średnia"
+    },
+    {
+     "name": "Potent Noble Topaz",
+     "value": "średnia"
+    },
+    {
+     "name": "Glinting Noble Topaz",
+     "value": "średnia"
+    },
+    {
+     "name": "Shifting Nightseye",
+     "value": "średnia"
+    },
+    {
+     "name": "Sovereign Nightseye",
+     "value": "średnia"
+    },
+    {
+     "name": "Glowing Nightseye",
+     "value": "średnia"
+    },
+    {
+     "name": "Royal Nightseye",
+     "value": "średnia"
+    },
+    {
+     "name": "Jagged Talasite",
+     "value": "niska"
+    },
+    {
+     "name": "Dazzling Talasite",
+     "value": "niska"
+    },
+    {
+     "name": "Enduring Talasite",
+     "value": "niska"
+    }
+   ],
+   "check": {
+    "type": "topRecipes",
+    "profession": "Jewelcrafting"
+   },
+   "sources": [
+    {
+     "title": "Wowhead: Burning Crusade Classic Gold Making With Professions Overview",
+     "url": "https://www.wowhead.com/tbc/guide/best-professions-how-to-make-gold-burning-crusade-classic",
+     "reliability": "wysoka",
+     "note": "przeczytany w całości; strona podaje aktualizację 2025-11-30"
+    },
+    {
+     "title": "Noobtoboss: TBC Classic Professions Gold Making Guide",
+     "url": "https://noobtoboss.com/tbc-classic-professions-gold-guide/",
+     "reliability": "średnia",
+     "note": "tylko streszczenie z wyszukiwarki"
+    },
+    {
+     "title": "Bitt's Guides: TBC Classic Gold - Professions",
+     "url": "https://bittsguides.com/tbc-classic-gold-professions/",
+     "reliability": "średnia",
+     "note": "tylko streszczenie z wyszukiwarki"
+    }
+   ]
+  },
+  {
+   "id": "enchanting",
+   "profession": "Enchanting",
+   "tier": "S",
+   "title": "Enchanting: enchanty, materiały i rozbiór",
+   "summary": "W TBC nie ma jeszcze welinów (pojawią się dopiero w Wrath), więc zarabiasz na samych enchantach, materiałach i olejach. Enchanty to usługa, nie przedmiot na AH.",
+   "points": [
+    "Najcenniejsze enchanty: Weapon - Mongoose, Sunfire i Soulfrost (bardzo wysoka), a także Greater Agility, Major Healing, 2H Major Agility, Savagery, Chest - Exceptional Stats, Boots - Cat's Swiftness i Boar's Speed (wysoka).",
+    "Void Crystal jest potrzebny do większości wysokich enchantów (średnia wartość).",
+    "Oleje (Superior Wizard/Mana Oil) i zwykłe materiały (Large Prismatic Shard, Arcane Dust) mają niską wartość.",
+    "Rozbiór (disenchant) daje stały dochód. Strona w zakładce Okazje -> Profesje pokazuje, które przedmioty z AH opłaca się rozbierać.",
+    "Wyrabianie umiejętności jest drogie - policz koszt przed startem (źródło o średniej wiarygodności)."
+   ],
+   "items": [
+    {
+     "name": "Void Crystal",
+     "value": "średnia"
+    },
+    {
+     "name": "Superior Wizard Oil",
+     "value": "niska"
+    },
+    {
+     "name": "Superior Mana Oil",
+     "value": "niska"
+    },
+    {
+     "name": "Large Prismatic Shard",
+     "value": "niska"
+    },
+    {
+     "name": "Greater Planar Essence",
+     "value": "niska"
+    },
+    {
+     "name": "Small Prismatic Shard",
+     "value": "niska"
+    },
+    {
+     "name": "Arcane Dust",
+     "value": "niska"
+    }
+   ],
+   "check": {
+    "type": "topDisenchant"
+   },
+   "sources": [
+    {
+     "title": "Wowhead: Burning Crusade Classic Gold Making With Professions Overview",
+     "url": "https://www.wowhead.com/tbc/guide/best-professions-how-to-make-gold-burning-crusade-classic",
+     "reliability": "wysoka",
+     "note": "przeczytany w całości; strona podaje aktualizację 2025-11-30"
+    },
+    {
+     "title": "Noobtoboss: TBC Classic Professions Gold Making Guide",
+     "url": "https://noobtoboss.com/tbc-classic-professions-gold-guide/",
+     "reliability": "średnia",
+     "note": "tylko streszczenie z wyszukiwarki"
+    }
+   ]
+  },
+  {
+   "id": "mining",
+   "profession": "Mining",
+   "tier": "A",
+   "title": "Mining: rudy, gemy i motes",
+   "summary": "Górnictwo zasila Jewelcrafting, Blacksmithing i Engineering, więc to, co wykopiesz, ma stały popyt. Węzłów rudy jest mniej niż ziół, ale gemy i motes dobrze się sprzedają.",
+   "points": [
+    "Living Ruby (wysoka wartość) jest potrzebny do gemów BiS pierwszej fazy dla wszystkich klas.",
+    "Star of Elune, Dawnstone, Noble Topaz, Hardened Adamantite Bar, Felsteel Bar, Khorium Bar i Mote of Fire/Primal Fire mają średnią wartość.",
+    "Surowa ruda bywa warta więcej niż sztabki, bo jubilerzy ją przerabiają.",
+    "Latający mount znacznie przyspiesza zbieranie w Outland."
+   ],
+   "items": [
+    {
+     "name": "Living Ruby",
+     "value": "wysoka"
+    },
+    {
+     "name": "Star of Elune",
+     "value": "średnia"
+    },
+    {
+     "name": "Dawnstone",
+     "value": "średnia"
+    },
+    {
+     "name": "Noble Topaz",
+     "value": "średnia"
+    },
+    {
+     "name": "Hardened Adamantite Bar",
+     "value": "średnia"
+    },
+    {
+     "name": "Felsteel Bar",
+     "value": "średnia"
+    },
+    {
+     "name": "Khorium Bar",
+     "value": "średnia"
+    },
+    {
+     "name": "Mote of Fire",
+     "value": "średnia"
+    },
+    {
+     "name": "Primal Fire",
+     "value": "średnia"
+    },
+    {
+     "name": "Nightseye",
+     "value": "niska"
+    },
+    {
+     "name": "Talasite",
+     "value": "niska"
+    },
+    {
+     "name": "Adamantite Ore",
+     "value": "niska"
+    },
+    {
+     "name": "Adamantite Bar",
+     "value": "niska"
+    },
+    {
+     "name": "Eternium Ore",
+     "value": "niska"
+    },
+    {
+     "name": "Eternium Bar",
+     "value": "niska"
+    },
+    {
+     "name": "Fel Iron Ore",
+     "value": "niska"
+    },
+    {
+     "name": "Fel Iron Bar",
+     "value": "niska"
+    },
+    {
+     "name": "Mote of Earth",
+     "value": "niska"
+    },
+    {
+     "name": "Primal Earth",
+     "value": "niska"
+    }
+   ],
+   "sources": [
+    {
+     "title": "Wowhead: Burning Crusade Classic Gold Making With Professions Overview",
+     "url": "https://www.wowhead.com/tbc/guide/best-professions-how-to-make-gold-burning-crusade-classic",
+     "reliability": "wysoka",
+     "note": "przeczytany w całości; strona podaje aktualizację 2025-11-30"
+    },
+    {
+     "title": "Noobtoboss: TBC Classic Professions Gold Making Guide",
+     "url": "https://noobtoboss.com/tbc-classic-professions-gold-guide/",
+     "reliability": "średnia",
+     "note": "tylko streszczenie z wyszukiwarki"
+    }
+   ]
+  },
+  {
+   "id": "herbalism",
+   "profession": "Herbalism",
+   "tier": "A",
+   "title": "Herbalism: zioła i motes dla alchemików",
+   "summary": "Ziół jest dużo, a alchemicy potrzebują ich ciągle. Zioła i motes z zielarstwa mają przyzwoitą wartość.",
+   "points": [
+    "Mote of Mana/Primal Mana, Mote of Life/Primal Life, Mana Thistle, Terocone, Nightmare Vine i Netherbloom mają średnią wartość.",
+    "Fel Lotus jest potrzebny do wszystkich flasek TBC (niska wartość, ale stały popyt).",
+    "Felweed, Ragveil, Dreaming Glory i Ancient Lichen są pospolite i tanie."
+   ],
+   "items": [
+    {
+     "name": "Mote of Mana",
+     "value": "średnia"
+    },
+    {
+     "name": "Primal Mana",
+     "value": "średnia"
+    },
+    {
+     "name": "Mote of Life",
+     "value": "średnia"
+    },
+    {
+     "name": "Primal Life",
+     "value": "średnia"
+    },
+    {
+     "name": "Mana Thistle",
+     "value": "średnia"
+    },
+    {
+     "name": "Terocone",
+     "value": "średnia"
+    },
+    {
+     "name": "Nightmare Vine",
+     "value": "średnia"
+    },
+    {
+     "name": "Netherbloom",
+     "value": "średnia"
+    },
+    {
+     "name": "Fel Lotus",
+     "value": "niska"
+    },
+    {
+     "name": "Ancient Lichen",
+     "value": "niska"
+    },
+    {
+     "name": "Dreaming Glory",
+     "value": "niska"
+    },
+    {
+     "name": "Ragveil",
+     "value": "niska"
+    },
+    {
+     "name": "Felweed",
+     "value": "niska"
+    }
+   ],
+   "sources": [
+    {
+     "title": "Wowhead: Burning Crusade Classic Gold Making With Professions Overview",
+     "url": "https://www.wowhead.com/tbc/guide/best-professions-how-to-make-gold-burning-crusade-classic",
+     "reliability": "wysoka",
+     "note": "przeczytany w całości; strona podaje aktualizację 2025-11-30"
+    },
+    {
+     "title": "Noobtoboss: TBC Classic Professions Gold Making Guide",
+     "url": "https://noobtoboss.com/tbc-classic-professions-gold-guide/",
+     "reliability": "średnia",
+     "note": "tylko streszczenie z wyszukiwarki"
+    }
+   ]
+  },
+  {
+   "id": "skinning",
+   "profession": "Skinning",
+   "tier": "B",
+   "title": "Skinning: skóry dla skórników",
+   "summary": "Skinning głównie wspiera Leatherworking (czasem też Blacksmithing i Tailoring). Skór jest dużo, więc ceny są umiarkowane.",
+   "points": [
+    "Cobra Scales mają średnią wartość i są potrzebne w kilku wysokich recepturach.",
+    "Knothide Leather to baza prawie wszystkich receptur Leatherworkingu (niska wartość, duże ilości).",
+    "Źródła nie są zgodne co do skórowania: jedne dają mu wysokie noty, inne uznają za mało dochodowe."
+   ],
+   "items": [
+    {
+     "name": "Cobra Scales",
+     "value": "średnia"
+    },
+    {
+     "name": "Thick Clefthoof Leather",
+     "value": "niska"
+    },
+    {
+     "name": "Heavy Knothide Leather",
+     "value": "niska"
+    },
+    {
+     "name": "Wind Scales",
+     "value": "niska"
+    },
+    {
+     "name": "Nether Dragonscales",
+     "value": "niska"
+    },
+    {
+     "name": "Fel Scales",
+     "value": "niska"
+    },
+    {
+     "name": "Crystal Infused Leather",
+     "value": "niska"
+    },
+    {
+     "name": "Knothide Leather",
+     "value": "niska"
+    }
+   ],
+   "sources": [
+    {
+     "title": "Wowhead: Burning Crusade Classic Gold Making With Professions Overview",
+     "url": "https://www.wowhead.com/tbc/guide/best-professions-how-to-make-gold-burning-crusade-classic",
+     "reliability": "wysoka",
+     "note": "przeczytany w całości; strona podaje aktualizację 2025-11-30"
+    },
+    {
+     "title": "Noobtoboss: TBC Classic Professions Gold Making Guide",
+     "url": "https://noobtoboss.com/tbc-classic-professions-gold-guide/",
+     "reliability": "średnia",
+     "note": "tylko streszczenie z wyszukiwarki"
+    }
+   ]
+  },
+  {
+   "id": "leatherworking",
+   "profession": "Leatherworking",
+   "tier": "B",
+   "title": "Leatherworking: ekwipunek pre-raid i enchanty na nogawki",
+   "summary": "Skórnik robi cenione nogawki i część ekwipunku, ale najlepsze elementy BiS są BoP, więc możliwości sprzedaży są ograniczone.",
+   "points": [
+    "Wyroby pre-raid pierwszej fazy: Cobrascale Gloves, Gloves of the Living Touch, Hood of Primal Life, Windslayer Wraps (bardzo wysoka wartość).",
+    "Nethercobra i Nethercleft Leg Armor (nogawki) oraz komplety Heavy Clefthoof i Fel Leather mają wysoką wartość.",
+    "Riding Crop (+10% prędkości mounta) ma wysoką wartość, a Drums of Battle średnią.",
+    "Wyrabianie jest drogie i wymaga dużo skór - warto połączyć z Skinningiem."
+   ],
+   "items": [
+    {
+     "name": "Cobrascale Gloves",
+     "value": "bardzo wysoka"
+    },
+    {
+     "name": "Gloves of the Living Touch",
+     "value": "bardzo wysoka"
+    },
+    {
+     "name": "Hood of Primal Life",
+     "value": "bardzo wysoka"
+    },
+    {
+     "name": "Windslayer Wraps",
+     "value": "bardzo wysoka"
+    },
+    {
+     "name": "Nethercobra Leg Armor",
+     "value": "wysoka"
+    },
+    {
+     "name": "Nethercleft Leg Armor",
+     "value": "wysoka"
+    },
+    {
+     "name": "Heavy Clefthoof Vest",
+     "value": "wysoka"
+    },
+    {
+     "name": "Heavy Clefthoof Leggings",
+     "value": "wysoka"
+    },
+    {
+     "name": "Heavy Clefthoof Boots",
+     "value": "wysoka"
+    },
+    {
+     "name": "Fel Leather Boots",
+     "value": "wysoka"
+    },
+    {
+     "name": "Fel Leather Leggings",
+     "value": "wysoka"
+    },
+    {
+     "name": "Fel Leather Gloves",
+     "value": "wysoka"
+    },
+    {
+     "name": "Riding Crop",
+     "value": "wysoka"
+    },
+    {
+     "name": "Cobrahide Leg Armor",
+     "value": "średnia"
+    },
+    {
+     "name": "Clefthide Leg Armor",
+     "value": "średnia"
+    },
+    {
+     "name": "Drums of Battle",
+     "value": "średnia"
+    }
+   ],
+   "check": {
+    "type": "topRecipes",
+    "profession": "Leatherworking"
+   },
+   "sources": [
+    {
+     "title": "Wowhead: Burning Crusade Classic Gold Making With Professions Overview",
+     "url": "https://www.wowhead.com/tbc/guide/best-professions-how-to-make-gold-burning-crusade-classic",
+     "reliability": "wysoka",
+     "note": "przeczytany w całości; strona podaje aktualizację 2025-11-30"
+    },
+    {
+     "title": "Noobtoboss: TBC Classic Professions Gold Making Guide",
+     "url": "https://noobtoboss.com/tbc-classic-professions-gold-guide/",
+     "reliability": "średnia",
+     "note": "tylko streszczenie z wyszukiwarki"
+    }
+   ]
+  },
+  {
+   "id": "blacksmithing",
+   "profession": "Blacksmithing",
+   "tier": "B",
+   "title": "Blacksmithing: BoE w pierwszej fazie, pręty i kamienie",
+   "summary": "Kowal przede wszystkim robi ekwipunek BoP dla siebie, a do sprzedaży zostaje mniej. BoE bronie i pancerze mają sens głównie w pierwszej fazie.",
+   "points": [
+    "Wysoko cenione BoE z pierwszej fazy: Eternium Runed Blade, Hand of Eternity, Bracers of the Green Fortress (bardzo wysoka), komplety Ragesteel i Felsteel (wysoka).",
+    "Pręty (Eternium, Adamantite, Fel Iron Rod) są potrzebne enchanterom do wyższych enchantów (średnia wartość).",
+    "Adamantite Sharpening Stone i Weightstone mają niską cenę, ale jeden z poradników uznaje je za najprostszy, stały zbyt.",
+    "Bez Miningu koszt materiałów zależy od AH i bywa nieprzewidywalny - sprawdź go w zakładce Okazje."
+   ],
+   "items": [
+    {
+     "name": "Eternium Runed Blade",
+     "value": "bardzo wysoka"
+    },
+    {
+     "name": "Hand of Eternity",
+     "value": "bardzo wysoka"
+    },
+    {
+     "name": "Bracers of the Green Fortress",
+     "value": "bardzo wysoka"
+    },
+    {
+     "name": "Ragesteel Helm",
+     "value": "wysoka"
+    },
+    {
+     "name": "Ragesteel Shoulders",
+     "value": "wysoka"
+    },
+    {
+     "name": "Ragesteel Breastplate",
+     "value": "wysoka"
+    },
+    {
+     "name": "Ragesteel Gloves",
+     "value": "wysoka"
+    },
+    {
+     "name": "Felsteel Helm",
+     "value": "wysoka"
+    },
+    {
+     "name": "Felsteel Gloves",
+     "value": "wysoka"
+    },
+    {
+     "name": "Felsteel Leggings",
+     "value": "wysoka"
+    },
+    {
+     "name": "Eternium Rod",
+     "value": "średnia"
+    },
+    {
+     "name": "Adamantite Rod",
+     "value": "średnia"
+    },
+    {
+     "name": "Fel Iron Rod",
+     "value": "średnia"
+    },
+    {
+     "name": "Adamantite Weapon Chain",
+     "value": "średnia"
+    },
+    {
+     "name": "Felsteel Shield Spike",
+     "value": "średnia"
+    },
+    {
+     "name": "Adamantite Sharpening Stone",
+     "value": "niska"
+    },
+    {
+     "name": "Adamantite Weightstone",
+     "value": "niska"
+    },
+    {
+     "name": "Greater Rune of Warding",
+     "value": "niska"
+    },
+    {
+     "name": "Greater Ward of Shielding",
+     "value": "niska"
+    }
+   ],
+   "check": {
+    "type": "topRecipes",
+    "profession": "Blacksmithing"
+   },
+   "sources": [
+    {
+     "title": "Wowhead: Burning Crusade Classic Gold Making With Professions Overview",
+     "url": "https://www.wowhead.com/tbc/guide/best-professions-how-to-make-gold-burning-crusade-classic",
+     "reliability": "wysoka",
+     "note": "przeczytany w całości; strona podaje aktualizację 2025-11-30"
+    },
+    {
+     "title": "Noobtoboss: TBC Classic Professions Gold Making Guide",
+     "url": "https://noobtoboss.com/tbc-classic-professions-gold-guide/",
+     "reliability": "średnia",
+     "note": "tylko streszczenie z wyszukiwarki"
+    },
+    {
+     "title": "Bitt's Guides: TBC Classic Gold - Professions",
+     "url": "https://bittsguides.com/tbc-classic-gold-professions/",
+     "reliability": "średnia",
+     "note": "tylko streszczenie z wyszukiwarki"
+    }
+   ]
+  },
+  {
+   "id": "engineering",
+   "profession": "Engineering",
+   "tier": "B",
+   "title": "Engineering: zabawki i przedmioty dla innych inżynierów",
+   "summary": "Inżynieria jest głównie do własnego użytku. Niewiele wyrobów da się sprzedać, i to zwykle innym inżynierom, a ich wytworzenie jest drogie.",
+   "points": [
+    "Wysoko cenione: Flying Machine Control i Turbo-Charged Flying Machine Control (jedyne craftowalne mounty, tylko dla inżynierów), Goblin Rocket Launcher, Gnomish Poultryizer, Nigh Invulnerability Belt.",
+    "Rocket Boots Xtreme (Lite): receptura jest BoP, ale wyrób jest BoE, więc da się go sprzedać.",
+    "Stabilized Eternium Scope i Khorium Scope to wysoko cenione ulepszenia broni dystansowej.",
+    "Zapthrottle Mote Extractor pozwala zbierać motes z chmur gazu w Outland."
+   ],
+   "items": [
+    {
+     "name": "Turbo-Charged Flying Machine Control",
+     "value": "wysoka"
+    },
+    {
+     "name": "Flying Machine Control",
+     "value": "wysoka"
+    },
+    {
+     "name": "Goblin Rocket Launcher",
+     "value": "wysoka"
+    },
+    {
+     "name": "Gnomish Poultryizer",
+     "value": "wysoka"
+    },
+    {
+     "name": "Rocket Boots Xtreme Lite",
+     "value": "wysoka"
+    },
+    {
+     "name": "Rocket Boots Xtreme",
+     "value": "wysoka"
+    },
+    {
+     "name": "Nigh Invulnerability Belt",
+     "value": "wysoka"
+    },
+    {
+     "name": "Stabilized Eternium Scope",
+     "value": "wysoka"
+    },
+    {
+     "name": "Khorium Scope",
+     "value": "wysoka"
+    },
+    {
+     "name": "Zapthrottle Mote Extractor",
+     "value": "średnia"
+    }
+   ],
+   "check": {
+    "type": "topRecipes",
+    "profession": "Engineering"
+   },
+   "sources": [
+    {
+     "title": "Wowhead: Burning Crusade Classic Gold Making With Professions Overview",
+     "url": "https://www.wowhead.com/tbc/guide/best-professions-how-to-make-gold-burning-crusade-classic",
+     "reliability": "wysoka",
+     "note": "przeczytany w całości; strona podaje aktualizację 2025-11-30"
+    },
+    {
+     "title": "Noobtoboss: TBC Classic Professions Gold Making Guide",
+     "url": "https://noobtoboss.com/tbc-classic-professions-gold-guide/",
+     "reliability": "średnia",
+     "note": "tylko streszczenie z wyszukiwarki"
+    }
+   ]
+  },
+  {
+   "id": "cooking-firstaid",
+   "profession": "Cooking",
+   "tier": null,
+   "title": "Cooking, First Aid, Fishing: profesje pomocnicze",
+   "summary": "W przeczytanych źródłach te profesje nie są zaliczane do zarabiających. Dają premie dla własnej postaci albo guildii.",
+   "points": [
+    "Nie znalazłem w źródłach potwierdzonej strategii zarabiania golda na Cooking, First Aid ani Fishing.",
+    "Receptury kulinarne i bandaże są w bazie strony, więc rankingi w zakładce Okazje je uwzględnią, jeśli skan ma ich ceny."
+   ],
+   "sources": [
+    {
+     "title": "Wowhead: Burning Crusade Classic Gold Making With Professions Overview",
+     "url": "https://www.wowhead.com/tbc/guide/best-professions-how-to-make-gold-burning-crusade-classic",
+     "reliability": "wysoka",
+     "note": "przeczytany w całości; strona podaje aktualizację 2025-11-30"
+    },
+    {
+     "title": "Noobtoboss: TBC Classic Professions Gold Making Guide",
+     "url": "https://noobtoboss.com/tbc-classic-professions-gold-guide/",
+     "reliability": "średnia",
+     "note": "tylko streszczenie z wyszukiwarki"
+    }
+   ]
+  }
+ ]
+}

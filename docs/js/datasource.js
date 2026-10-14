@@ -53,7 +53,18 @@ export function makeContext(model, catalog = {}) {
       return last?.[mode] ?? null;
     },
     vendorSell: (id) => items[id]?.vendorSell ?? null,
-    vendorBuy: (id) => items[id]?.vendorBuy ?? null,
+    vendorBuy: (id) => catalog.vendors?.[id] ?? items[id]?.vendorBuy ?? null,
     disenchant: (id) => catalog.disenchant?.(id, items[id]) ?? null,
+  };
+}
+
+// de: zawartość disenchant.json ({brackets: {id: {n, outcomes: [[materiał, szansa, ilość]]}}, items: {id: bracket}}).
+// Zwraca funkcję id -> [{item, chance, qty}] albo null dla przedmiotów, których nie da się rozbić.
+export function makeDisenchant(de) {
+  if (!de?.items) return null;
+  return (id) => {
+    const bracket = de.brackets?.[de.items[id]];
+    if (!bracket) return null;
+    return bracket.outcomes.map(([item, chance, qty]) => ({ item, chance, qty }));
   };
 }

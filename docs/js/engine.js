@@ -79,9 +79,9 @@ export function evaluateRecipe(recipe, ctx, opts = {}) {
   let cost = 0;
   const missing = [];
   for (const r of recipe.reagents) {
-    const ah = ctx.ahPrice(r.item, buyMode);
+    // składnik sprzedawany przez kupca zawsze liczymy po cenie kupca (ma nieograniczony zapas), nie z AH
     const vb = ctx.vendorBuy?.(r.item);
-    const unit = ah != null && vb != null ? Math.min(ah, vb) : ah ?? vb;
+    const unit = vb != null ? vb : ctx.ahPrice(r.item, buyMode);
     if (unit != null) cost += unit * r.count; else missing.push(r.item);
   }
   const res = { recipe, cost, missing };
