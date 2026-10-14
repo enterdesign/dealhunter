@@ -2,7 +2,8 @@ local _, ns = ...
 local Known = {}
 ns.Known = Known
 
--- Zapamiętuje receptury znane postaci, gdy otwierasz okno profesji (tradeskill) albo enchantingu (craft).
+-- Zapamiętuje receptury znane postaci z OTWARTEGO okna profesji (tradeskill) albo enchantingu (craft).
+-- Skan uruchamia użytkownik (przycisk w oknie profesji albo /dhah recipes), nie dzieje się sam przy każdym otwarciu.
 -- DealHunterAHDB.known[nazwaProfesji][recipeId] = true; identyfikator to numer czaru z linku receptury.
 -- Zbiory kumulują się (suma), więc nic nie ginie, gdy okno pokazuje tylko część listy (zwinięte kategorie, filtry).
 
@@ -11,7 +12,7 @@ local function recipeId(link)
   return tonumber(link:match("enchant:(%d+)") or link:match("spell:(%d+)"))
 end
 
--- Dodaje receptury z `ids` do zapisanych dla profesji; zwraca liczbę NOWYCH.
+-- Dodaje receptury z `ids` do zapisanych dla profesji; zwraca: liczbę NOWYCH, nazwę profesji, łączną liczbę zapisanych.
 function Known.merge(profession, ids)
   if not profession or profession == "" or profession == "UNKNOWN" then return 0 end
   local db = DealHunterAHDB
@@ -22,7 +23,9 @@ function Known.merge(profession, ids)
   for _, id in ipairs(ids) do
     if not set[id] then set[id] = true; added = added + 1 end
   end
-  return added, profession
+  local total = 0
+  for _ in pairs(set) do total = total + 1 end
+  return added, profession, total
 end
 
 function Known.scanTradeSkill()
