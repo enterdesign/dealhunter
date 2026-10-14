@@ -30,7 +30,8 @@ function R.evaluate(recipe, ctx, opts)
   return res
 end
 
--- opts: profession, known (zbiór recipeId -> true), knownOnly, includeIncomplete, minProfit
+-- opts: profession, known (zbiór recipeId -> true), knownOnly, includeIncomplete, minProfit,
+--       sortBy ("profit" | "roi" | "cost" | "value", malejąco)
 function R.rank(recipes, ctx, opts)
   opts = opts or {}
   local out = {}
@@ -47,6 +48,11 @@ function R.rank(recipes, ctx, opts)
       end
     end
   end
-  table.sort(out, function(a, b) return a.profit > b.profit end)
+  local key = opts.sortBy or "profit"
+  table.sort(out, function(a, b)
+    local x, y = a[key] or -math.huge, b[key] or -math.huge
+    if x ~= y then return x > y end
+    return a.recipe.id < b.recipe.id
+  end)
   return out
 end

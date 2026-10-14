@@ -7,6 +7,6 @@ Nie automatyzuje żadnych akcji - ceny zbiera z aukcji, które pokazuje gra po T
 - `addon/DealHunterAH/` - addon (Lua); skopiuj do `Interface/AddOns/`.
 - `tests/` - testy silnika wyceny (`python3 -m unittest discover -s tests`, wymaga `pip install lupa`).
 
-Status: silnik i zbieranie cen gotowe, niesprawdzone w grze. Brak jeszcze danych receptur
+Status: silnik, zbieranie cen i okno (`/dhah`) gotowe, ale niesprawdzone w grze. Brak jeszcze danych receptur
 (Engineering, Blacksmithing) i tabel disenchant - generowane osobnym skryptem.
 Wartości do potwierdzenia na kliencie: numer Interface w `.toc`, prowizja AH, sygnatury API.

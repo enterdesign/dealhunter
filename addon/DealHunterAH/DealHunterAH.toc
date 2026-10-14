@@ -4,11 +4,14 @@
 ## SavedVariables: DealHunterAHDB
 ## OptionalDeps: Auctionator
 
+src\Format.lua
 src\Stats.lua
 src\History.lua
 src\Fees.lua
 src\Valuation.lua
 src\Recipes.lua
 src\Prices.lua
+src\Known.lua
 src\Scanner.lua
+src\UI.lua
 src\Core.lua

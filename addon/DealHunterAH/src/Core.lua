@@ -1,23 +1,21 @@
 local ADDON, ns = ...
 
-local function money(c)
-  if not c then return "?" end
-  c = math.floor(c + 0.5)
-  local sign = c < 0 and "-" or ""
-  c = math.abs(c)
-  return ("%s%dg %ds %dc"):format(sign, math.floor(c / 10000), math.floor(c / 100) % 100, c % 100)
-end
+local money = function(c) return ns.Format.money(c) end
 
 local function say(msg) print("|cff66ccffDealHunterAH|r: " .. msg) end
 
 local frame = CreateFrame("Frame")
 frame:RegisterEvent("ADDON_LOADED")
 frame:RegisterEvent("AUCTION_ITEM_LIST_UPDATE")
+frame:RegisterEvent("TRADE_SKILL_SHOW")
+frame:RegisterEvent("TRADE_SKILL_UPDATE")
 frame:SetScript("OnEvent", function(_, event, arg1)
   if event == "ADDON_LOADED" and arg1 == ADDON then
     DealHunterAHDB = DealHunterAHDB or { items = {}, ahType = "faction" }
   elseif event == "AUCTION_ITEM_LIST_UPDATE" then
     ns.Scanner.onListUpdate()
+  elseif event == "TRADE_SKILL_SHOW" or event == "TRADE_SKILL_UPDATE" then
+    ns.Known.scan()
   end
 end)
 
@@ -44,27 +42,12 @@ local function cmdItem(arg)
   end
 end
 
-local function cmdTop(arg)
-  local recipes = ns.Data and ns.Data.recipes
-  if not recipes then return say("brak danych receptur (Data\\Recipes.lua nie wygenerowany)") end
-  local profession = arg ~= "" and arg or nil
-  local ranked = ns.Recipes.rank(recipes, ns.MakeContext(), {
-    profession = profession, feeOpts = { ahType = DealHunterAHDB.ahType },
-  })
-  for i = 1, math.min(10, #ranked) do
-    local r = ranked[i]
-    say(("%d. %s: zysk %s (koszt %s, %s)%s"):format(
-      i, r.recipe.name, money(r.profit), money(r.cost), r.use, r.known and "" or " [nieznana]"))
-  end
-  if #ranked == 0 then say("brak kompletnych wyników - zrób skan AH dla składników i wyrobów") end
-end
-
 SLASH_DEALHUNTERAH1 = "/dhah"
 SlashCmdList["DEALHUNTERAH"] = function(msg)
   local cmd, arg = msg:match("^(%S*)%s*(.*)$")
   if cmd == "item" then cmdItem(arg)
-  elseif cmd == "top" then cmdTop(arg)
+  elseif cmd == "" or cmd == "top" then ns.UI.toggle()
   elseif cmd == "ah" and (arg == "faction" or arg == "neutral") then
     DealHunterAHDB.ahType = arg; say("typ AH: " .. arg)
-  else say("komendy: /dhah item <link> | /dhah top [profesja] | /dhah ah faction|neutral") end
+  else say("komendy: /dhah (okno) | /dhah item <link> | /dhah ah faction|neutral") end
 end

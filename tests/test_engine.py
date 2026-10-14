@@ -14,7 +14,7 @@ def load_engine():
     lua = lupa.LuaRuntime(unpack_returned_tuples=True)
     ns = lua.table()
     loader = lua.eval("function(code, name, ns) return assert(load(code, name))(name, ns) end")
-    for name in ("Stats", "History", "Fees", "Valuation", "Recipes"):
+    for name in ("Format", "Stats", "History", "Fees", "Valuation", "Recipes"):
         loader((SRC / f"{name}.lua").read_text(), name, ns)
     return lua, ns
 
@@ -175,6 +175,47 @@ class RecipeTests(unittest.TestCase):
         self.assertFalse(ranked[1].known)
         self.assertTrue(ranked[2].known)
         self.assertEqual(len(ranked), 2)
+
+
+class FormatTests(unittest.TestCase):
+    def setUp(self):
+        self.lua, self.ns = load_engine()
+
+    def test_money(self):
+        self.assertEqual(self.ns.Format.money(123456), "12g 34s 56c")
+        self.assertEqual(self.ns.Format.money(-150), "-0g 1s 50c")
+        self.assertEqual(self.ns.Format.money(None), "?")
+
+    def test_pct(self):
+        self.assertEqual(self.ns.Format.pct(0.256), "+26%")
+        self.assertEqual(self.ns.Format.pct(None), "-")
+
+
+class SortTests(RecipeTests):
+    def test_sort_by_roi_and_cost(self):
+        prices = {(10, "low"): 100, (11, "low"): 1000, (98, "median"): 400, (99, "median"): 3000}
+        ctx = ctx_from(self.lua, prices)
+        recipes = self.lua.table_from([
+            self.recipe(1, 98, [(10, 1)]),    # koszt 100, wartość 380 -> roi 2.8
+            self.recipe(2, 99, [(11, 1)]),    # koszt 1000, wartość 2850 -> roi 1.85, zysk wyższy
+        ])
+        by = lambda k: [self.ns.Recipes.rank(recipes, ctx, self.lua.table(sortBy=k))[i].recipe.id for i in (1, 2)]
+        self.assertEqual(by("profit"), [2, 1])
+        self.assertEqual(by("roi"), [1, 2])
+        self.assertEqual(by("cost"), [2, 1])
+
+
+class SyntaxTests(unittest.TestCase):
+    def test_all_lua_files_compile(self):
+        lua = lupa.LuaRuntime()
+        check = lua.eval("function(code, name) local f, err = load(code, name); return err end")
+        for f in sorted(SRC.glob("*.lua")):
+            self.assertIsNone(check(f.read_text(), f.name), f.name)
+
+    def test_toc_lists_every_source_file(self):
+        toc = (SRC.parent / "DealHunterAH.toc").read_text()
+        for f in SRC.glob("*.lua"):
+            self.assertIn(f"src\\{f.name}", toc)
 
 
 if __name__ == "__main__":
