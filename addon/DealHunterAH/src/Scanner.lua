@@ -14,6 +14,9 @@ local pending = false
 Scanner.FLUSH_DELAY = 3
 Scanner.FULL_SCAN_MIN = 5000   -- tyle ofert w jednej partii uznajemy za pełny skan
 Scanner.ignored = 0            -- ile częściowych list pominięto (do /dhah status)
+Scanner.REPEAT_WINDOW = 600    -- ta sama lista (tyle samo ofert) w ciągu 10 minut to odświeżenie po skanie, nie nowy skan
+Scanner.lastBatch = nil
+Scanner.lastAt = 0
 
 function Scanner.isComplete(batch, total)
   total = total or batch
@@ -68,7 +71,14 @@ end
 -- Odczyt i zapis robimy raz, po ciszy (pełny skan wywołuje to zdarzenie wielokrotnie).
 function Scanner.process()
   pending = false
-  if Scanner.collect() then Scanner.flush() end
+  local batch = GetNumAuctionItems("list") or 0
+  local now = time()
+  -- Po pełnym skanie gra odświeża listę jeszcze kilka razy; nie przetwarzamy i nie zgłaszamy tego samego skanu wielokrotnie.
+  if batch > 0 and batch == Scanner.lastBatch and now - Scanner.lastAt < Scanner.REPEAT_WINDOW then return end
+  if Scanner.collect() then
+    Scanner.flush()
+    Scanner.lastBatch, Scanner.lastAt = batch, now
+  end
 end
 
 function Scanner.onListUpdate()
