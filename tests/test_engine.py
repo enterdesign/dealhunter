@@ -156,10 +156,11 @@ class RecipeTests(unittest.TestCase):
         self.assertAlmostEqual(res.profit, 600)
         self.assertTrue(res.complete)
 
-    def test_vendor_reagent_cheaper_than_ah(self):
+    def test_vendor_reagent_always_priced_at_vendor(self):
         ctx = ctx_from(self.lua, {(10, "low"): 100, (99, "median"): 1000}, vendor_buy={10: 40})
-        res = self.ns.Recipes.evaluate(self.recipe(1, 99, [(10, 2)]), ctx)
-        self.assertEqual(res.cost, 80)
+        self.assertEqual(self.ns.Recipes.evaluate(self.recipe(1, 99, [(10, 2)]), ctx).cost, 80)
+        ctx = ctx_from(self.lua, {(10, "low"): 10, (99, "median"): 1000}, vendor_buy={10: 40})
+        self.assertEqual(self.ns.Recipes.evaluate(self.recipe(1, 99, [(10, 2)]), ctx).cost, 80)
 
     def test_missing_reagent_marks_incomplete(self):
         ctx = ctx_from(self.lua, {(99, "median"): 1000})

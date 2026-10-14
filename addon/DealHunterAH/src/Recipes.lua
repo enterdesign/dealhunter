@@ -11,9 +11,9 @@ function R.evaluate(recipe, ctx, opts)
   local buyMode = opts.buyMode or "low"
   local cost, missing = 0, {}
   for _, r in ipairs(recipe.reagents) do
-    local ah = ctx.ahPrice(r.item, buyMode)
+    -- składnik sprzedawany przez kupcę liczymy po cenie kupca, nie z AH
     local vb = ctx.vendorBuy and ctx.vendorBuy(r.item)
-    local unit = (ah and vb) and math.min(ah, vb) or ah or vb
+    local unit = vb or ctx.ahPrice(r.item, buyMode)
     if unit then cost = cost + unit * r.count else missing[#missing + 1] = r.item end
   end
 

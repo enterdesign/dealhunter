@@ -53,7 +53,25 @@ export function makeContext(model, catalog = {}) {
       return last?.[mode] ?? null;
     },
     vendorSell: (id) => items[id]?.vendorSell ?? null,
-    vendorBuy: (id) => items[id]?.vendorBuy ?? null,
-    disenchant: (id) => catalog.disenchant?.(id, items[id]) ?? null,
+    vendorBuy: (id) => catalog.vendors?.[id] ?? items[id]?.vendorBuy ?? null,
+    disenchant: (id) => catalog.disenchant?.(id) ?? null,
+    deSample: (id) => catalog.disenchant?.sample?.(id) ?? null,
   };
+}
+
+// de: zawartość disenchant.json ({brackets: {id: {n, outcomes: [[materiał, szansa, [[ilość, udział], ...]]]}}, items: {id: bracket}}).
+// Zwraca funkcję id -> [{item, chance, qty (średnia), dist}] albo null dla przedmiotów, których nie da się rozbić.
+// fn.sample(id) -> liczba obserwacji, na których oparto wynik.
+export function makeDisenchant(de) {
+  if (!de?.items) return null;
+  const bracketOf = (id) => de.brackets?.[de.items[id]];
+  const fn = (id) => {
+    const bracket = bracketOf(id);
+    if (!bracket) return null;
+    return bracket.outcomes.map(([item, chance, dist]) => ({
+      item, chance, dist, qty: dist.reduce((s, [q, share]) => s + q * share, 0),
+    }));
+  };
+  fn.sample = (id) => bracketOf(id)?.n ?? null;
+  return fn;
 }

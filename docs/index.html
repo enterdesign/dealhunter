@@ -11,81 +11,22 @@
 <body>
 <header>
   <h1>DealHunter AH</h1>
-  <p class="sub">Opłacalność przedmiotów i receptur z aukcji WoW. Dane z Twojego pliku, liczone lokalnie w przeglądarce.</p>
+  <p class="sub">Pomocnik do zarabiania golda na aukcjach WoW. Wybierz tryb gry.</p>
 </header>
-
 <main>
-  <section class="card" id="data">
-    <h2>Dane</h2>
-    <label class="drop" id="drop">
-      <input type="file" id="file" accept=".lua" hidden>
-      <strong>Przeciągnij plik SavedVariables tutaj</strong> albo kliknij, żeby wybrać
-      <span class="hint">np. <code>WTF/Account/…/SavedVariables/DealHunterAH.lua</code> (po <code>/reload</code> w grze)</span>
-    </label>
-    <ul class="status" id="status"></ul>
-  </section>
-
-  <nav class="tabs" role="tablist">
-    <button role="tab" data-tab="recipes" aria-selected="true">Receptury</button>
-    <button role="tab" data-tab="items" aria-selected="false">Przedmioty</button>
-    <button role="tab" data-tab="settings" aria-selected="false">Ustawienia</button>
-  </nav>
-
-  <section class="card tab" id="tab-recipes">
-    <div class="toolbar">
-      <select id="profession" aria-label="Profesja"></select>
-      <label><input type="checkbox" id="knownOnly"> tylko znane</label>
-      <label><input type="checkbox" id="incomplete"> pokaż niekompletne</label>
+  <div class="modes">
+    <a class="mode card" href="tbc/">
+      <h2>The Burning Crusade Anniversary</h2>
+      <p>Okazje z Twojego skanu AH: flipy do vendora, receptury, flipy wg historii cen i inwestycje z guidów.</p>
+      <span class="badge ok">dostępny</span>
+    </a>
+    <div class="mode card disabled" aria-disabled="true">
+      <h2>World of Warcraft Forever</h2>
+      <p>Ten tryb pojawi się po premierze gry (zapowiedziana na 4 listopada 2026) i dostępności danych.</p>
+      <span class="badge">wkrótce</span>
     </div>
-    <div class="scroll"><table id="recipeTable">
-      <thead><tr>
-        <th>Receptura</th>
-        <th class="num sortable" data-sort="cost">Koszt</th>
-        <th class="num sortable" data-sort="value">Wartość</th>
-        <th class="num sortable" data-sort="profit">Zysk</th>
-        <th class="num sortable" data-sort="roi">ROI</th>
-        <th>Jak</th>
-      </tr></thead>
-      <tbody></tbody>
-    </table></div>
-    <p class="empty" id="recipesEmpty"></p>
-  </section>
-
-  <section class="card tab" id="tab-items" hidden>
-    <div class="toolbar">
-      <input type="search" id="itemFilter" placeholder="Szukaj po nazwie lub ID" aria-label="Szukaj przedmiotu">
-    </div>
-    <div class="scroll"><table id="itemTable">
-      <thead><tr>
-        <th>Przedmiot</th>
-        <th class="num">Najniższa</th>
-        <th class="num">Mediana</th>
-        <th class="num">Średnia</th>
-        <th class="num">Ilość</th>
-        <th>Trend 7d</th>
-      </tr></thead>
-      <tbody></tbody>
-    </table></div>
-    <p class="empty" id="itemsEmpty"></p>
-  </section>
-
-  <section class="card tab" id="tab-settings" hidden>
-    <div class="form">
-      <label>Sprzedaż po cenie
-        <select id="sellMode"><option value="median">mediana</option><option value="low">najniższa</option><option value="avg">średnia</option></select>
-      </label>
-      <label>Zakup składników po cenie
-        <select id="buyMode"><option value="low">najniższa</option><option value="median">mediana</option><option value="avg">średnia</option></select>
-      </label>
-      <label class="inline"><input type="checkbox" id="feeEnabled"> Uwzględnij prowizję AH
-        <input type="number" id="feeCut" min="0" max="100" step="1" value="5"> %
-      </label>
-      <p class="hint">Prowizja i depozyt są domyślnie wyłączone.</p>
-      <button type="button" id="clear">Usuń zapamiętane dane z tej przeglądarki</button>
-    </div>
-  </section>
+  </div>
+  <p class="hint">Dane z pliku SavedVariables są liczone lokalnie w przeglądarce i nigdzie nie są wysyłane.</p>
 </main>
-
-<script type="module" src="js/app.js"></script>
 </body>
 </html>

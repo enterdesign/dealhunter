@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
-"""Buduje docs/data/recipes.json i docs/data/items.json z tabel DB2 pobranych przez fetch_wago.py.
+"""Buduje docs/data/tbc/recipes.json i docs/data/tbc/items.json z tabel DB2 pobranych przez fetch_wago.py.
 
-Użycie: python3 tools/build_data.py --raw data-raw/2.5.6.70006 [--out docs/data]
+Użycie: python3 tools/build_data.py --raw data-raw/2.5.6.70006 [--out docs/data/tbc]
 Uwaga: w plikach klienta NIE ma tabel dropu (rozbiór, kupcy) - tych danych ten skrypt nie zawiera.
 """
 import argparse
@@ -92,7 +92,7 @@ def build(raw, out, build_name=""):
 def main():
     ap = argparse.ArgumentParser()
     ap.add_argument("--raw", required=True)
-    ap.add_argument("--out", default="docs/data")
+    ap.add_argument("--out", default="docs/data/tbc")
     args = ap.parse_args()
     recipes, items = build(args.raw, args.out, pathlib.Path(args.raw).name)
     by = {}
