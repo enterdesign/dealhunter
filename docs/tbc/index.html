@@ -9,6 +9,19 @@
 <link rel="stylesheet" href="../style.css">
 </head>
 <body data-mode="tbc">
+<div class="errorbar" id="errorbar" hidden></div>
+<script>
+(function () {
+  var bar = document.getElementById("errorbar");
+  function show(msg) {
+    bar.hidden = false;
+    bar.textContent = "Błąd strony: " + msg + " - odśwież bez cache (Ctrl+F5). Jeśli się powtarza, wyślij mi ten komunikat.";
+  }
+  window.addEventListener("error", function (e) { show(e.message || "nie udało się załadować pliku " + (e.target && (e.target.src || e.target.href))); }, true);
+  window.addEventListener("unhandledrejection", function (e) { show(String((e.reason && e.reason.message) || e.reason)); });
+})();
+</script>
+
 <header>
   <p class="crumb"><a href="../">&larr; Wybór trybu</a></p>
   <h1>DealHunter AH <span class="tag">TBC Anniversary</span></h1>
@@ -99,6 +112,6 @@
   </section>
 </main>
 
-<script type="module" src="../js/app.js"></script>
+<script type="module" src="../js/app.js?v=e383d2cd"></script>
 </body>
 </html>
