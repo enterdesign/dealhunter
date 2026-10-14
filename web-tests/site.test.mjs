@@ -501,9 +501,9 @@ test("receptura: trend gotowego wyrobu w wierszu", () => {
 });
 
 test("DealHunterAH: zapis bez mediany i średniej (podsumowania z Forever beta) oznaczony jako noMedian", () => {
-  const withMedian = loadSavedVariables('DealHunterAHDB = { ["items"] = { [1] = { ["history"] = { { ["t"] = 5, ["low"] = 10, ["median"] = 12, ["qty"] = 3 } } } } }');
+  const withMedian = loadSavedVariables('DealHunterAHDB = { ["items"] = { ["100"] = { ["history"] = { { ["t"] = 5, ["low"] = 10, ["median"] = 12, ["qty"] = 3 } } } } }');
   assert.equal(withMedian.noMedian, false);
-  const lowOnly = loadSavedVariables('DealHunterAHDB = { ["items"] = { [1] = { ["history"] = { { ["t"] = 5, ["low"] = 10, ["qty"] = 3 } } } } }');
+  const lowOnly = loadSavedVariables('DealHunterAHDB = { ["items"] = { ["100"] = { ["history"] = { { ["t"] = 5, ["low"] = 10, ["qty"] = 3 } } } } }');
   assert.equal(lowOnly.noMedian, true);
-  assert.equal(makeContext(lowOnly, { items: {} }).ahPrice(1, "median"), 10);   // mediana = najniższa cena
+  assert.equal(makeContext(lowOnly, { items: {} }).ahPrice(100, "median"), 10);   // mediana = najniższa cena
 });
