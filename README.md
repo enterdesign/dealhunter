@@ -41,7 +41,9 @@ Instalacja i użycie:
    W Chrome i Edge kliknij raz „Połącz z plikami…” i wskaż pliki; potem po każdym skanie wystarczy `/reload` w grze
    i przycisk „Odśwież z połączonych plików” (przeglądarka zapamiętuje połączenie, czasem pyta o zgodę na odczyt).
 
-Komendy: `/dhah` (status), `/dhah recipes`, `/dhah item <link>`, `/dhah reset yes`.
+Ceny u kupców addon odczytuje z klienta gry (dane z sieci mogą nie pasować do Forever): sprzedaż kupcowi po skanie AH albo
+`/dhah vendor`, kupno po otwarciu okna kupca. Strona używa ich przed danymi z katalogu.
+Komendy: `/dhah` (status), `/dhah recipes`, `/dhah vendor`, `/dhah item <link>`, `/dhah reset yes`.
 Diagnostyka, gdy po skanie nic się nie zapisuje: `/dhah debug` (jakie API aukcji ma klient, ile zdarzeń list widziano, ostatnia lista)
 i `/dhah spy` (włącz, zrób skan, potem `/dhah debug` pokaże, jakie zdarzenia aukcji faktycznie przychodzą; wyłącz tą samą komendą).
 Addon obsługuje trzy interfejsy aukcji: klasyczny (TBC, Classic Era), "replicate" i "browse" (WoW Forever beta; Auctionator w trybie

@@ -55,7 +55,7 @@ def load():
     lua.execute(STUBS)
     ns = lua.table()
     loader = lua.eval("function(code, name, ns) return assert(load(code, name))(name, ns) end")
-    for name in ("Stats", "History", "Known", "Scanner"):
+    for name in ("Stats", "History", "Known", "Vendor", "Scanner"):
         loader((SRC / f"{name}.lua").read_text(), name, ns)
     return lua, ns
 
@@ -349,6 +349,53 @@ class StatsHistoryTests(unittest.TestCase):
         for i in range(70):
             self.ns.History.add(db, 6, s, i * 7200)
         self.assertEqual(len(db["items"][6]["history"]), 60)
+
+
+class VendorTests(unittest.TestCase):
+    def setUp(self):
+        self.lua, self.ns = load()
+        self.lua.execute("""
+            _info = {}
+            _requested = {}
+            function GetItemInfo(id) local p = _info[id]; if p == nil then return nil end; return "n", "l", 1, 1, 1, "t", "s", 1, "e", "tex", p end
+            C_Item = { RequestLoadItemDataByID = function(id) _requested[id] = true end }
+            _merchant = {}
+            function GetMerchantNumItems() return #_merchant end
+            function GetMerchantItemInfo(i) local m = _merchant[i]; return "n", "tex", m.price, m.qty, m.available end
+            function GetMerchantItemLink(i) return "|cffffffff|Hitem:" .. _merchant[i].id .. "::::|h[x]|h|r" end
+            function GetMerchantItemCostInfo(i) return _merchant[i].extended or 0 end
+        """)
+        self.db = self.lua.eval("DealHunterAHDB")
+
+    def test_sell_price_read_from_client_and_pending_requested(self):
+        self.lua.execute("_info[20744] = 100")
+        self.assertTrue(self.ns.Vendor.recordSell(20744))
+        self.assertFalse(self.ns.Vendor.recordSell(5))
+        self.assertTrue(self.lua.eval("_requested[5]"))
+        self.assertEqual(self.db["vendor"]["sell"][20744], 100)
+        self.lua.execute("_info[5] = 25")
+        self.ns.Vendor.onItemInfo(5)
+        self.assertEqual(self.db["vendor"]["sell"][5], 25)
+
+    def test_sweep_covers_scanned_items(self):
+        self.lua.execute("DealHunterAHDB.items[7] = {history = {}}; DealHunterAHDB.items[8] = {history = {}}; _info[7] = 0")
+        known, waiting = self.ns.Vendor.sweep()
+        self.assertEqual((known, waiting), (1, 1))
+
+    def test_merchant_records_unit_price_of_unlimited_coin_only_goods(self):
+        self.lua.execute("""
+            _merchant = {
+              { id = 3371, price = 20, qty = 1, available = -1 },
+              { id = 2880, price = 1000, qty = 5, available = -1 },
+              { id = 999, price = 50, qty = 1, available = 3 },
+              { id = 998, price = 50, qty = 1, available = -1, extended = 2 },
+            }""")
+        self.assertEqual(self.ns.Vendor.scanMerchant(), 2)
+        buy = self.db["vendor"]["buy"]
+        self.assertEqual(buy[3371], 20)
+        self.assertEqual(buy[2880], 200)
+        self.assertIsNone(buy[999])
+        self.assertIsNone(buy[998])
 
 
 class FilesTests(unittest.TestCase):

@@ -123,6 +123,7 @@ function Scanner.flush()
   browse = {}
   if saved > 0 then
     print(("|cff66ccffDealHunterAH|r: zapisano ceny %d przedmiotów. Wpisz /reload, żeby plik się zapisał."):format(saved))
+    if ns.onScanSaved then pcall(ns.onScanSaved) end
   end
   return saved
 end
