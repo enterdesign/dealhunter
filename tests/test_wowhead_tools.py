@@ -63,7 +63,7 @@ class DisenchantTests(unittest.TestCase):
         reps = de.representatives(listings, {100: 1, 101: 1, 102: 1}, k=2)
         self.assertEqual(reps, {1: [101, 100]})
 
-    def test_aggregate_chance_and_quantity(self):
+    def test_aggregate_chance_and_quantity_distribution(self):
         # dwa przedmioty z jednego przedziału: łącznie 200 rozbiorów, materiał 7 wypadł 150 razy
         recs = {
             100: [{"id": 7, "count": 100, "outof": 100, "pctstack": "{1: 50,2: 50}"}],
@@ -74,7 +74,10 @@ class DisenchantTests(unittest.TestCase):
         self.assertEqual(out[1]["n"], 200)
         by = {o[0]: o for o in out[1]["outcomes"]}
         self.assertAlmostEqual(by[7][1], 0.75)
-        self.assertAlmostEqual(by[7][2], (1.5 * 100 + 1 * 50) / 150, places=3)
+        shares = dict(by[7][2])
+        self.assertAlmostEqual(shares[1], 2 / 3, places=3)   # 50 + 50 z 150 wypadnięć
+        self.assertAlmostEqual(shares[2], 1 / 3, places=3)
+        self.assertAlmostEqual(sum(shares.values()), 1.0, places=2)
         self.assertAlmostEqual(by[8][1], 0.25)
 
     def test_rare_outcomes_dropped(self):

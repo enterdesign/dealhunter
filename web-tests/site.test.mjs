@@ -2,7 +2,7 @@
 import test from "node:test";
 import assert from "node:assert/strict";
 import { parseSavedVariables } from "../docs/js/luaparse.js";
-import { summarize, trend, netProceeds, itemValue, evaluateRecipe, rankRecipes, formatMoney, formatPct } from "../docs/js/engine.js";
+import { summarize, trend, netProceeds, itemValue, evaluateRecipe, rankRecipes, formatMoney, formatPct, disenchantStats, confidenceLabel } from "../docs/js/engine.js";
 import { loadSavedVariables, makeContext } from "../docs/js/datasource.js";
 
 // ---------- parser Lua ----------
@@ -181,7 +181,7 @@ test("loadSavedVariables: nieznany format i plik Auctionatora dają czytelny bł
 
 // ---------- okazje ----------
 import { professionIndex, matchesProfession, vendorFlips, ahFlips, disenchantFlips, craftFlips,
-  resolveWatchlist, guideInvestments, filterRows, sortRows, NO_PROFESSION } from "../docs/js/opportunities.js";
+  resolveWatchlist, guideInvestments, filterRows, sortRows, onlyProfitable, NO_PROFESSION } from "../docs/js/opportunities.js";
 
 const mk = (entries) => ({ items: new Map(entries.map(([id, h]) => [id, h])) });
 const H = (prices, extra = {}) => prices.map((p, i) => ({ t: 1_000_000 + i * 86400, low: p, median: p, avg: p, qty: 5, ...extra }));
@@ -198,15 +198,16 @@ test("indeks profesji i filtr", () => {
   assert.equal(matchesProfession(["A"], NO_PROFESSION), false);
 });
 
-test("flipy do vendora: tylko gdy kupiec płaci więcej niż AH", () => {
+test("flipy do vendora: pokazuje wszystkie przedmioty z ceną u kupca, także ze stratą", () => {
   const model = mk([[1, H([100, 100, 100])], [2, H([500])], [3, H([50])]]);
   const catalog = cat({ 1: { name: "A", vendorSell: 300 }, 2: { name: "B", vendorSell: 400 }, 3: { name: "C" } });
-  const rows = vendorFlips(model, catalog, new Map());
-  assert.deepEqual(rows.map((r) => [r.id, r.profit]), [[1, 200]]);
+  const rows = sortRows(vendorFlips(model, catalog, new Map()), "profit");
+  assert.deepEqual(rows.map((r) => [r.id, r.profit]), [[1, 200], [2, -100]]);
   assert.equal(rows[0].roi, 2);
+  assert.deepEqual(onlyProfitable(rows).map((r) => r.id), [1]);
 });
 
-test("flipy AH: kupno poniżej historycznej mediany", () => {
+test("flipy AH: porównanie z historyczną medianą, wszystkie z historią, ujemne też", () => {
   const model = mk([
     [1, H([1000, 1000, 1000, 600])],   // okazja: 600 vs 1000
     [2, H([1000, 1000, 1000, 950])],   // za mała zniżka
@@ -215,22 +216,48 @@ test("flipy AH: kupno poniżej historycznej mediany", () => {
     [5, H([50, 50, 50, 10])],          // poniżej minPrice
   ]);
   const catalog = cat({ 1: { name: "A" }, 2: { name: "B" }, 3: { name: "C" }, 4: { name: "D" }, 5: { name: "E" } });
-  const rows = ahFlips(model, catalog, new Map());
-  assert.deepEqual(rows.map((r) => r.id), [1]);
-  assert.equal(rows[0].profit, 400);
+  const rows = sortRows(ahFlips(model, catalog, new Map()), "profit");
+  assert.deepEqual(rows.map((r) => [r.id, r.profit]), [[1, 400], [2, 50], [4, -500]]); // 3 (za mało punktów) i 5 (za tanie) pominięte
   assert.equal(rows[0].trend.dir, "down");
   // prowizja zmniejsza zysk
-  const withFee = ahFlips(model, catalog, new Map(), { fee: { enabled: true, cut: 0.1 } });
+  const withFee = sortRows(ahFlips(model, catalog, new Map(), { fee: { enabled: true, cut: 0.1 } }), "profit");
   assert.equal(withFee[0].profit, 300);
 });
 
-test("rozbiór: kupno przedmiotu i sprzedaż materiałów", () => {
-  const model = mk([[1, H([100])], [2, H([1000])], [9, H([5])]]);
-  const ctx = ctxOf({ "2:median": 1000, "2:low": 1000 }, { de: { 1: [{ item: 2, qty: 1, chance: 0.5 }], 9: [{ item: 2, qty: 1, chance: 0.001 }] } });
+test("rozbiór: zawsze pokazany (także ze stratą), z EV, rozrzutem i dwoma najczęstszymi wynikami", () => {
+  const model = mk([[1, H([100])], [2, H([1000])], [9, H([5000])]]);
+  const ctx = ctxOf({}, { de: {
+    1: [{ item: 2, chance: 0.75, qty: 1.5, dist: [[1, 0.5], [2, 0.5]] }, { item: 3, chance: 0.25, dist: [[1, 1]] }],
+    9: [{ item: 2, chance: 1, dist: [[1, 1]] }],
+  } });
   ctx.ahPrice = (id, mode) => model.items.get(id)?.at(-1)[mode] ?? null;
-  const rows = disenchantFlips(model, cat({ 1: { name: "Zielony" }, 9: { name: "Tani" } }), ctx);
-  assert.deepEqual(rows.map((r) => [r.id, r.profit]), [[1, 400]]);
-  assert.deepEqual(rows[0].professions, ["Enchanting"]);
+  ctx.deSample = (id) => (id === 1 ? 800 : 20);
+  const rows = sortRows(disenchantFlips(model, cat({ 1: { name: "Zielony" }, 9: { name: "Drogi" } }), ctx), "profit");
+  assert.equal(rows.length, 2); // ujemny też
+  const [good, bad] = rows;
+  assert.equal(good.id, 1);
+  // materiał 3 bez ceny -> niekompletne; EV z samego materiału 2: 0.375*1000 + 0.375*2000 = 1125
+  assert.equal(good.complete, false);
+  assert.equal(Math.round(good.value), 1125); assert.equal(Math.round(good.profit), 1025);
+  assert.deepEqual(good.de.top.map((x) => [x.item, x.qty]).slice(0, 2).sort(), [[2, 1], [2, 2]].sort());
+  assert.equal(good.confidence, "wysoka"); assert.equal(bad.confidence, "niska");
+  assert.equal(bad.profit, 1000 - 5000);
+  assert.deepEqual(good.professions, ["Enchanting"]);
+});
+
+test("disenchantStats: EV i odchylenie dla wykluczających się wyników", () => {
+  // 50%: 1 szt. po 100, 50%: nic -> EV 50, SD 50
+  const s = disenchantStats([{ item: 1, chance: 0.5, dist: [[1, 1]] }], () => 100);
+  assert.equal(s.ev, 50); assert.equal(s.sd, 50); assert.equal(s.exclusive, true);
+  // dwa wykluczające się wyniki po 50%: 100 albo 300 -> EV 200, SD 100
+  const t = disenchantStats([{ item: 1, chance: 0.5, dist: [[1, 1]] }, { item: 2, chance: 0.5, dist: [[1, 1]] }], (i) => (i === 1 ? 100 : 300));
+  assert.equal(t.ev, 200); assert.equal(t.sd, 100);
+  assert.equal(t.top.length, 2); assert.equal(t.top[0].p, 0.5);
+  // szanse > 1 -> przybliżenie niezależnością
+  const u = disenchantStats([{ item: 1, chance: 1, dist: [[1, 1]] }, { item: 2, chance: 1, dist: [[1, 1]] }], () => 100);
+  assert.equal(u.exclusive, false); assert.equal(u.ev, 200); assert.equal(u.sd, 0);
+  assert.equal(confidenceLabel(500), "wysoka"); assert.equal(confidenceLabel(100), "średnia"); assert.equal(confidenceLabel(10), "niska");
+  assert.equal(confidenceLabel(null), "nieznana");
 });
 
 test("receptury jako okazje: koszt, zysk i profesja", () => {
@@ -267,8 +294,9 @@ import { runCheck } from "../docs/js/opportunities.js";
 import { makeDisenchant } from "../docs/js/datasource.js";
 
 test("makeDisenchant: wyniki rozbioru po przedziale; brak = null", () => {
-  const de = makeDisenchant({ brackets: { 5: { n: 10, outcomes: [[22445, 0.8, 2.5], [22447, 0.2, 1]] } }, items: { 100: 5 } });
-  assert.deepEqual(de(100), [{ item: 22445, chance: 0.8, qty: 2.5 }, { item: 22447, chance: 0.2, qty: 1 }]);
+  const de = makeDisenchant({ brackets: { 5: { n: 10, outcomes: [[22445, 0.8, [[2, 0.5], [3, 0.5]]], [22447, 0.2, [[1, 1]]]] } }, items: { 100: 5 } });
+  assert.deepEqual(de(100), [{ item: 22445, chance: 0.8, dist: [[2, 0.5], [3, 0.5]], qty: 2.5 }, { item: 22447, chance: 0.2, dist: [[1, 1]], qty: 1 }]);
+  assert.equal(de.sample(100), 10);
   assert.equal(de(101), null);
   assert.equal(makeDisenchant(null), null);
 });

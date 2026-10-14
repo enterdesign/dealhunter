@@ -1,8 +1,8 @@
 import { loadSavedVariables, makeContext, makeDisenchant } from "./datasource.js";
-import { trend, formatMoney, formatPct } from "./engine.js";
+import { trend, formatMoney, formatPct, netProceeds } from "./engine.js";
 import {
   professionIndex, vendorFlips, craftFlips, disenchantFlips, ahFlips, resolveWatchlist, guideInvestments,
-  filterRows, sortRows, runCheck, NO_PROFESSION,
+  filterRows, sortRows, runCheck, onlyProfitable, NO_PROFESSION,
 } from "./opportunities.js";
 
 const $ = (id) => document.getElementById(id);
@@ -15,11 +15,11 @@ const KIND_LABEL = { craft: "receptura", disenchant: "rozbiór" };
 
 const DEAL_KINDS = [
   { id: "vendor", label: "Flipy do vendora",
-    help: "Kup na AH taniej, niż płaci kupiec, i sprzedaj kupcowi." },
+    help: "Kup na AH taniej, niż płaci kupiec, i sprzedaj kupcowi. Pokazujemy wszystkie skanowane przedmioty (zysk może być ujemny)." },
   { id: "craft", label: "Flipy do profesji",
-    help: "Kup składniki, wytwórz i sprzedaj wyrób albo kup przedmiot i go rozbierz. Receptury pochodzą z bazy gry (także te, których nie znasz)." },
+    help: "Kup składniki, wytwórz i sprzedaj wyrób albo kup przedmiot i go rozbierz (wartość = oczekiwana z rozbioru, z rozrzutem i pewnością). Składniki od kupców liczymy po cenie kupca. Receptury z bazy gry, także nieznane." },
   { id: "ah", label: "Flipy na AH",
-    help: "Kup taniej niż zwykle: aktualna najniższa cena kontra mediana z historii Twoich skanów (potrzebne co najmniej 3 skany)." },
+    help: "Aktualna najniższa cena kontra mediana z historii Twoich skanów (potrzebne co najmniej 3 skany). Dodatni zysk = taniej niż zwykle." },
   { id: "guide", label: "Inwestycje z guidów",
     help: "Przedmioty polecane w guidach (zakładka Strategie) z aktualną ceną i dystansem do typowej ceny." },
 ];
@@ -92,16 +92,15 @@ function computeDeals() {
   const ctx = makeContext(state.model, state.catalog);
   const idx = state.profIdx;
   const base = { buyMode: s.buyMode, sellMode: s.sellMode, fee: s.fee };
-  const minDiscount = (Number($("minDiscount").value) || 0) / 100;
   state.ctx = ctx;
   state.deals = {
     vendor: vendorFlips(state.model, state.catalog, idx, base),
     craft: [
       ...craftFlips(state.recipes, ctx, { ...base, known: state.model.known, knownOnly: $("knownOnly").checked,
-        includeIncomplete: $("incomplete").checked }),
+        includeIncomplete: !$("hideIncomplete").checked }),
       ...disenchantFlips(state.model, state.catalog, ctx, base),
     ],
-    ah: ahFlips(state.model, state.catalog, idx, { ...base, minDiscount }),
+    ah: ahFlips(state.model, state.catalog, idx, base),
     guide: guideInvestments(state.watch, state.model, state.catalog, base),
   };
 }
@@ -118,13 +117,15 @@ const COLUMNS = {
     { label: "Profesje", cell: (r) => td(r.professions.join(", "), "dim") },
   ],
   craft: [
-    { label: "Wyrób / przedmiot", cell: (r) => td(r.name + (r.kind === "craft" && !r.known ? "  [?]" : "") + (r.kind === "craft" && !r.complete ? "  *" : "")) },
+    { label: "Wyrób / przedmiot", cell: (r) => td(r.name + (r.kind === "craft" && !r.known ? "  [?]" : "") + (r.complete ? "" : "  *")) },
     { label: "Typ", cell: (r) => td(KIND_LABEL[r.kind], "dim") },
     { label: "Koszt", key: "cost", cell: (r) => td(money(r.cost), "num") },
     { label: "Wartość", cell: (r) => td(money(r.value), "num") },
     { label: "Zysk", key: "profit", cell: (r) => td(money(r.profit), "num " + (r.profit >= 0 ? "good" : "bad")) },
     { label: "ROI", key: "roi", cell: (r) => td(formatPct(r.roi), "num") },
     { label: "Jak", cell: (r) => td(r.kind === "craft" ? (USE_LABEL[r.use] ?? "") : "rozbiór") },
+    { label: "Rozrzut", cell: (r) => td(r.kind === "disenchant" ? `± ${money(r.sd)}` : "-", "num dim") },
+    { label: "Pewność", cell: (r) => td(r.kind === "disenchant" ? r.confidence : "-", "dim") },
     { label: "Profesja", cell: (r) => td(r.professions.join(", "), "dim") },
   ],
   ah: [
@@ -167,9 +168,38 @@ function dealDetail(r) {
     if (x.recipe.skill) parts.push(`Umiejętność: ${x.recipe.skill}`);
     return parts.join("\n");
   }
+  if (r.kind === "disenchant") return disenchantDetail(r);
   const parts = [`ID przedmiotu: ${r.id}`];
   if (r.strategy) parts.push(`Strategia: ${r.strategy}`);
-  if (r.kind === "disenchant") parts.push("Wartość = oczekiwana wartość materiałów z rozbioru po cenach z AH.");
+  return parts.join("\n");
+}
+
+function disenchantDetail(r) {
+  const d = r.de;
+  const scen = (x) => `${x.qty}× ${itemName(x.item)} (szansa ${formatPct(x.p).replace("+", "")}) ≈ ${x.known ? money(x.v) : "brak ceny"}`;
+  const lo = Math.max(0, d.ev - d.sd), hi = d.ev + d.sd;
+  const parts = [
+    `Wartość oczekiwana rozbioru (EV): ${money(d.ev)}; zakres typowy: ${money(lo)} - ${money(hi)} (± ${money(d.sd)}${d.exclusive ? "" : ", przybliżone"})`,
+    `Koszt zakupu: ${money(r.cost)} | zysk oczekiwany: ${money(r.profit)}`,
+    `Pewność: ${r.confidence}${r.sample != null ? ` (${r.sample} rozbiorów w próbie)` : ""}`,
+    "Najczęstsze wyniki:",
+    ...d.top.map((x, i) => `  ${i + 1}. ${scen(x)}`),
+  ];
+  const mats = new Map();
+  for (const x of d.scenarios) {
+    const m = mats.get(x.item) ?? { p: 0, q: 0 };
+    m.p += x.p; m.q += x.p * x.qty;
+    mats.set(x.item, m);
+  }
+  parts.push("Wszystkie możliwe materiały: " + [...mats].map(([id, m]) =>
+    `${itemName(id)} ${formatPct(m.p).replace("+", "")}, średnio ${(m.q / m.p).toFixed(1)} szt.`).join("; "));
+  const vendor = state.catalog.items?.[r.id]?.vendorSell;
+  const h = state.model.items.get(r.id);
+  const alt = [];
+  if (vendor) alt.push(`kupiec ${money(vendor)}`);
+  if (h) alt.push(`AH (mediana) ${money(netProceeds(h[h.length - 1].median, settings().fee))}`);
+  if (alt.length) parts.push(`Gdyby przedmiot sprzedać: ${alt.join(", ")}`);
+  if (!r.complete) parts.push("* Brak ceny AH dla części materiałów - wartość jest zaniżona.");
   return parts.join("\n");
 }
 
@@ -191,7 +221,6 @@ function renderDeals() {
   const kind = DEAL_KINDS.find((k) => k.id === state.deal);
   $("dealHelp").textContent = kind.help;
   $("optKnown").hidden = $("optIncomplete").hidden = state.deal !== "craft";
-  $("optDiscount").hidden = state.deal !== "ah";
   document.querySelectorAll("#sortbar button").forEach((b) => {
     const active = b.dataset.sort === state.sortBy;
     b.classList.toggle("active", active);
@@ -216,7 +245,9 @@ function renderDeals() {
   if (state.deal === "craft" && !state.recipes.length) { empty.textContent = "Brak bazy receptur."; return; }
   if (state.deal === "guide" && !state.watch.length) { empty.textContent = "Brak listy przedmiotów z guidów."; return; }
 
-  const rows = sortRows(filterRows(state.deals[state.deal] ?? [], state.profession), state.sortBy, state.sortDir);
+  let rows = filterRows(state.deals[state.deal] ?? [], state.profession);
+  if ($("hideLoss").checked) rows = onlyProfitable(rows);
+  rows = sortRows(rows, state.sortBy, state.sortDir);
   empty.textContent = rows.length ? `Pokazano ${Math.min(rows.length, 300)} z ${rows.length}.`
     : "Brak wyników dla tych filtrów (spróbuj zmienić profesję, dodać skany lub poluzować progi).";
   for (const r of rows.slice(0, 300)) {
@@ -356,8 +387,9 @@ function wire() {
   $("profession").addEventListener("change", (e) => { state.profession = e.target.value; renderDeals(); });
   $("stratProfession").addEventListener("change", (e) => { state.stratProfession = e.target.value; renderStrategies(); });
   document.querySelectorAll("#sortbar button").forEach((b) => b.addEventListener("click", () => setSort(b.dataset.sort)));
-  for (const id of ["knownOnly", "incomplete", "minDiscount", "sellMode", "buyMode", "feeEnabled", "feeCut"])
+  for (const id of ["knownOnly", "hideIncomplete", "sellMode", "buyMode", "feeEnabled", "feeCut"])
     $(id).addEventListener("change", () => refresh());
+  $("hideLoss").addEventListener("change", renderDeals);
   $("itemFilter").addEventListener("input", (e) => { state.itemFilter = e.target.value; renderItems(); });
   $("clear").addEventListener("click", () => {
     try { localStorage.removeItem(STORE_KEY); } catch { /* ignoruj */ }

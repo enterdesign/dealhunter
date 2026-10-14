@@ -1,7 +1,7 @@
 // Wyszukiwanie okazji na podstawie skanu AH. Wszystkie ceny w miedzi, wszystkie funkcje czyste (testowalne).
 //
 // model: { items: Map(id -> history[]) }   catalog: { items: {id: {name, vendorSell, bop, ...}} }
-import { trend, netProceeds, itemValue, rankRecipes } from "./engine.js";
+import { trend, netProceeds, rankRecipes, disenchantStats, confidenceLabel } from "./engine.js";
 
 export const NO_PROFESSION = "__none";
 
@@ -32,14 +32,13 @@ function row(base) {
 }
 
 // A. Kup na AH za mniej, niż płaci kupiec, i sprzedaj kupcowi.
-export function vendorFlips(model, catalog, idx, { buyMode = "low", minProfit = 1 } = {}) {
+export function vendorFlips(model, catalog, idx, { buyMode = "low" } = {}) {
   const out = [];
   for (const [id, h] of model.items) {
     const sell = catalog.items?.[id]?.vendorSell;
     const cost = last(h)[buyMode];
     if (!sell || cost == null) continue;
     const profit = sell - cost;
-    if (profit < minProfit) continue;
     out.push(row({ kind: "vendor", id, name: nameOf(catalog, id), cost, value: sell, profit,
       qty: last(h).qty, professions: profsOf(idx, id) }));
   }
@@ -54,27 +53,30 @@ export function craftFlips(recipes, ctx, opts) {
   }));
 }
 
-// B2. Rozbiór: kup przedmiot na AH, rozbierz, sprzedaj materiały (Enchanting).
-export function disenchantFlips(model, catalog, ctx, { buyMode = "low", sellMode = "median", fee, minProfit = 1 } = {}) {
+// B2. Rozbiór: kup przedmiot na AH, rozbierz, sprzedaj materiały. Pokazujemy każdy skanowany przedmiot,
+// który da się rozbić (zysk może być ujemny). value = EV rozbioru, sd = rozrzut, top = 2 najczęstsze wyniki.
+export function disenchantFlips(model, catalog, ctx, { buyMode = "low", sellMode = "median", fee } = {}) {
   const out = [];
   for (const [id, h] of model.items) {
     const cost = last(h)[buyMode];
     const outcomes = ctx.disenchant?.(id);
     if (cost == null || !outcomes) continue;
-    const v = itemValue(id, { ...ctx, vendorSell: () => null, ahPrice: (i, m) => (i === id ? null : ctx.ahPrice(i, m)) },
-      { sellMode, fee });
-    if (!v || v.disenchant == null || v.deIncomplete) continue;
-    const profit = v.disenchant - cost;
-    if (profit < minProfit) continue;
-    out.push(row({ kind: "disenchant", id, name: nameOf(catalog, id), cost, value: v.disenchant, profit,
+    const stats = disenchantStats(outcomes, (m) => {
+      const p = ctx.ahPrice(m, sellMode);
+      return p == null ? null : netProceeds(p, fee);
+    });
+    const sample = ctx.deSample?.(id) ?? null;
+    out.push(row({ kind: "disenchant", id, name: nameOf(catalog, id), cost, value: stats.ev, profit: stats.ev - cost,
+      sd: stats.sd, de: stats, sample, confidence: confidenceLabel(sample), complete: !stats.incomplete,
       qty: last(h).qty, professions: ["Enchanting"] }));
   }
   return out;
 }
 
 // C. Flipy na AH wg historii: kup poniżej typowej ceny z przeszłości, sprzedaj w typowej cenie.
+// Pokazujemy wszystkie przedmioty z historią (zysk może być ujemny, gdy cena jest wyższa niż zwykle).
 // ref = mediana wcześniejszych median (bez ostatniego skanu), cost = ostatnia najniższa cena.
-export function ahFlips(model, catalog, idx, { minPoints = 3, minDiscount = 0.1, minPrice = 100,
+export function ahFlips(model, catalog, idx, { minPoints = 3, minPrice = 100,
   sellMode = "median", fee, trendOpts } = {}) {
   const out = [];
   for (const [id, h] of model.items) {
@@ -85,7 +87,6 @@ export function ahFlips(model, catalog, idx, { minPoints = 3, minDiscount = 0.1,
     const ref = refs[Math.floor((refs.length - 1) / 2)];
     if (ref < minPrice) continue;
     const profit = netProceeds(ref, fee) - cost;
-    if (profit <= 0 || ref / cost - 1 < minDiscount) continue;
     out.push(row({ kind: "ah", id, name: nameOf(catalog, id), cost, value: ref, profit, qty: last(h).qty,
       trend: trend(h, trendOpts), professions: profsOf(idx, id) }));
   }
@@ -153,3 +154,5 @@ export function runCheck(check, { recipes, model, catalog, ctx, opts = {} }) {
   if (check.type === "topDisenchant") return top(disenchantFlips(model, catalog, ctx, opts));
   return null;
 }
+
+export const onlyProfitable = (rows) => rows.filter((r) => r.profit > 0);

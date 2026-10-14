@@ -44,7 +44,7 @@ export function trend(history, { days = 7, flat = 0.05, field = "median" } = {})
   return { change, slope, dir, baseline: base, current, points: n };
 }
 
-// ctx: { vendorSell(id), ahPrice(id, mode), disenchant(id) -> [{item, qty, chance}] | null }
+// ctx: { vendorSell(id), ahPrice(id, mode), disenchant(id) -> [{item, chance, qty, dist?}] | null }
 export function itemValue(itemId, ctx, { sellMode = "median", fee = FEE_DEFAULTS } = {}) {
   const out = {};
   const vendor = ctx.vendorSell(itemId);
@@ -55,14 +55,13 @@ export function itemValue(itemId, ctx, { sellMode = "median", fee = FEE_DEFAULTS
 
   const de = ctx.disenchant?.(itemId);
   if (de) {
-    let total = 0, incomplete = false;
-    for (const o of de) {
-      const p = ctx.ahPrice(o.item, sellMode);
-      if (p != null) total += o.chance * o.qty * netProceeds(p, fee);
-      else incomplete = true;
-    }
-    out.disenchant = total;
-    if (incomplete) out.deIncomplete = true;
+    const stats = disenchantStats(de, (id) => {
+      const p = ctx.ahPrice(id, sellMode);
+      return p == null ? null : netProceeds(p, fee);
+    });
+    out.disenchant = stats.ev;
+    out.deStats = stats;
+    if (stats.incomplete) out.deIncomplete = true;
   }
 
   let best = null, value = null;
@@ -129,4 +128,39 @@ export function formatMoney(c) {
 
 export function formatPct(x) {
   return x == null ? "-" : `${x >= 0 ? "+" : ""}${Math.round(x * 100)}%`;
+}
+
+// Wartość rozbioru jako rozkład: wartość oczekiwana (EV), odchylenie standardowe, najczęstsze scenariusze.
+// outcomes: [{item, chance, qty, dist: [[ilość, udział], ...]}]; priceOf(id) -> cena netto za sztukę | null.
+// Gdy szanse materiałów sumują się do <= 1, wyniki wykluczają się (jeden materiał na rozbiór) i rozrzut
+// liczymy dokładnie; w przeciwnym razie zakładamy niezależność materiałów (przybliżenie).
+export function disenchantStats(outcomes, priceOf) {
+  const totalChance = outcomes.reduce((s, o) => s + o.chance, 0);
+  const exclusive = totalChance <= 1.02;
+  let ev = 0, ev2 = 0, varIndep = 0, incomplete = false;
+  const scenarios = [];
+  for (const o of outcomes) {
+    const price = priceOf(o.item);
+    if (price == null) incomplete = true;
+    const dist = o.dist?.length ? o.dist : [[o.qty ?? 1, 1]];
+    let mean = 0, mean2 = 0;
+    for (const [q, share] of dist) {
+      const p = o.chance * share;
+      const v = price == null ? 0 : q * price;
+      scenarios.push({ item: o.item, qty: q, p, v, known: price != null });
+      mean += p * v; mean2 += p * v * v;
+    }
+    ev += mean; ev2 += mean2;
+    varIndep += mean2 - mean * mean;
+  }
+  const variance = exclusive ? ev2 - ev * ev : varIndep;
+  scenarios.sort((a, b) => b.p - a.p);
+  return { ev, sd: Math.sqrt(Math.max(0, variance)), scenarios, top: scenarios.slice(0, 2),
+    exclusive, coverage: totalChance, incomplete };
+}
+
+// Pewność wyniku wg liczby obserwacji w próbie.
+export function confidenceLabel(n) {
+  if (n == null) return "nieznana";
+  return n >= 500 ? "wysoka" : n >= 100 ? "średnia" : "niska";
 }

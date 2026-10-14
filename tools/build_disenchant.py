@@ -89,9 +89,13 @@ def representatives(listings, item_bracket, k=TOP_ITEMS):
 
 def aggregate(item_records, item_bracket):
     """item_records: {item_id: [rekordy z zakładki "Disenchanting" tego przedmiotu]} ->
-    {bracket: {"n": liczba rozbiorów w próbie, "outcomes": [[materiał, szansa, średnia ilość], ...]}}"""
+    {bracket: {"n": liczba rozbiorów w próbie, "outcomes": [[materiał, szansa, [[ilość, udział], ...]], ...]}}
+
+    "szansa" = szansa, że rozbiór da ten materiał; "udział" = rozkład ilości, gdy materiał wypadnie
+    (udziały jednego materiału sumują się do 1)."""
     n = {}
-    drops = {}   # (bracket, material) -> [count, ważona suma ilości, suma wag]
+    counts = {}   # (bracket, material) -> liczba wypadnięć
+    qty = {}      # (bracket, material) -> {ilość: ważona liczba wypadnięć}
     for item, recs in item_records.items():
         b = item_bracket.get(item)
         if b is None or not recs:
@@ -100,20 +104,24 @@ def aggregate(item_records, item_bracket):
         for rec in recs:
             if not rec.get("count"):
                 continue
-            d = drops.setdefault((b, rec["id"]), [0, 0.0, 0.0])
+            key = (b, rec["id"])
+            counts[key] = counts.get(key, 0) + rec["count"]
             stack = parse_stack(rec.get("pctstack")) or {1: 100.0}
             total = sum(stack.values())
-            d[0] += rec["count"]
-            d[1] += sum(q * p for q, p in stack.items()) / total * rec["count"]
-            d[2] += rec["count"]
+            dist = qty.setdefault(key, {})
+            for q, pct in stack.items():
+                dist[q] = dist.get(q, 0.0) + rec["count"] * pct / total
 
     result = {}
-    for (b, material), (count, qsum, wsum) in drops.items():
+    for (b, material), count in counts.items():
         chance = count / n[b] if n.get(b) else 0
         if chance < MIN_CHANCE:
             continue
+        dist = qty[(b, material)]
+        total = sum(dist.values())
+        shares = [[q, round(w / total, 3)] for q, w in sorted(dist.items()) if w / total >= 0.005]
         result.setdefault(b, {"n": n[b], "outcomes": []})["outcomes"].append(
-            [material, round(min(chance, 1.0), 4), round(qsum / wsum, 3)])
+            [material, round(min(chance, 1.0), 4), shares])
     for entry in result.values():
         entry["outcomes"].sort(key=lambda o: -o[1])
     return result
