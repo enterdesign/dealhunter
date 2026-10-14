@@ -1,10 +1,10 @@
-import { loadSavedVariables, makeContext, makeDisenchant, selectHouse } from "./datasource.js?v=02a553d7";
-import { kvSet, kvGet, kvDelete } from "./store.js?v=02a553d7";
-import { trend, formatMoney, formatPct, netProceeds } from "./engine.js?v=02a553d7";
+import { loadSavedVariables, makeContext, makeDisenchant, selectHouse } from "./datasource.js?v=dc31e9d0";
+import { kvSet, kvGet, kvDelete } from "./store.js?v=dc31e9d0";
+import { trend, formatMoney, formatPct, netProceeds } from "./engine.js?v=dc31e9d0";
 import {
   professionIndex, vendorFlips, craftFlips, disenchantFlips, ahFlips, resolveWatchlist, guideInvestments,
   filterRows, sortRows, runCheck, onlyProfitable, filterReliable, filterBop, NO_PROFESSION,
-} from "./opportunities.js?v=02a553d7";
+} from "./opportunities.js?v=dc31e9d0";
 
 const $ = (id) => document.getElementById(id);
 const MODE = document.body.dataset.mode || "tbc";
@@ -79,6 +79,17 @@ function el(tag, props = {}, ...children) {
 }
 function td(text, cls) { return el("td", { textContent: text, className: cls ?? "" }); }
 
+// Składniki receptury: każdy w osobnej linii z przyciskiem kopiowania nazwy (do wyszukania na AH w grze).
+function ingredientsCell(r) {
+  const cell = el("td", { className: "wrap dim" });
+  for (const g of r.ingredients) {
+    const name = itemName(g.item);
+    const detail = g.source === "BoP" ? " (BoP, nie do kupienia)" : g.unit == null ? " (brak ceny)" : ` @ ${money(g.unit)} ${g.source}`;
+    cell.append(el("div", { className: "ing" }, `${g.count}× ${name}${detail}`, copyButton(name)));
+  }
+  return cell;
+}
+
 function ingredientsText(r) {
   return r.ingredients.map((g) =>
     `${g.count}× ${itemName(g.item)}${g.source === "BoP" ? " (BoP, nie do kupienia)" : g.unit == null ? " (brak ceny)" : ` @ ${money(g.unit)} ${g.source}`}`).join("; ");
@@ -111,6 +122,40 @@ function trendCell(t) {
   return td(`${TREND_LABEL[t.dir]} ${formatPct(t.change)}`, cls);
 }
 
+// Kopiuje tekst do schowka (Clipboard API, a gdy go brak: starsza metoda przez ukryte pole), żeby wkleić nazwę w grze.
+async function copyText(text) {
+  try {
+    await navigator.clipboard.writeText(text);
+    return true;
+  } catch {
+    const area = el("textarea", { value: text, style: "position: fixed; opacity: 0" });
+    document.body.append(area);
+    area.select();
+    let ok = false;
+    try { ok = document.execCommand("copy"); } catch { /* brak zgody */ }
+    area.remove();
+    return ok;
+  }
+}
+
+function copyButton(text) {
+  const b = el("button", { type: "button", className: "copy", textContent: "⧉", title: `Kopiuj nazwę: ${text}` });
+  b.setAttribute("aria-label", `Kopiuj nazwę ${text}`);
+  b.addEventListener("click", async (e) => {
+    e.stopPropagation();   // nie rozwijaj szczegółów wiersza
+    const ok = await copyText(text);
+    b.textContent = ok ? "✓" : "✗";
+    b.classList.toggle("done", ok);
+    setTimeout(() => { b.textContent = "⧉"; b.classList.remove("done"); }, 1200);
+  });
+  return b;
+}
+
+// Komórka z nazwą przedmiotu i przyciskiem kopiowania (kopiuje czystą nazwę, bez oznaczeń).
+function nameCell(name, flags = "") {
+  return el("td", { className: "name" }, el("span", { textContent: name + flags }), copyButton(name));
+}
+
 function profList() {
   return [...new Set(state.recipes.map((r) => r.profession))].sort();
 }
@@ -135,7 +180,7 @@ function computeDeals() {
 // ---------- widok: okazje ----------
 const COLUMNS = {
   vendor: [
-    { label: "Przedmiot", cell: (r) => td(r.name) },
+    { label: "Przedmiot", cell: (r) => nameCell(r.name) },
     { label: "Koszt (AH)", key: "cost", cell: (r) => td(money(r.cost), "num") },
     { label: "Vendor", cell: (r) => td(money(r.value), "num") },
     { label: "Zysk", key: "profit", cell: profitCell },
@@ -144,9 +189,10 @@ const COLUMNS = {
     { label: "Profesje", cell: (r) => td(r.professions.join(", "), "dim") },
   ],
   craft: [
-    { label: "Wyrób (X)", cell: (r) => el("td", { className: "name" }, r.name + (r.known ? "" : "  [?]") + (r.complete ? "" : "  *"),
+    { label: "Wyrób (X)", cell: (r) => el("td", { className: "name" }, el("span", { textContent: r.name + (r.known ? "" : "  [?]") + (r.complete ? "" : "  *") }),
+        copyButton(r.name),
         el("div", { className: "dim small", textContent: `${r.professions.join(", ")} · ofert wyrobu na AH: ${r.qty ?? "-"}${r.bopReagents?.length ? " · wymaga materiałów BoP" : ""}` })) },
-    { label: "Składniki (Y, Z)", cell: (r) => el("td", { className: "wrap dim", textContent: ingredientsText(r) }) },
+    { label: "Składniki (Y, Z)", cell: (r) => ingredientsCell(r) },
     { label: "Koszt składników", key: "cost", cell: (r) => td(money(r.cost) + (r.bopReagents?.length ? " + BoP" : ""), "num" + (r.bopReagents?.length ? " warn" : "")) },
     { label: "Cena X na AH → zysk/strata", key: "profitAh", cell: (r) => optionCell(r, "ah", r.profitAh) },
     { label: "Cena X u kupca → zysk/strata", key: "profitVendor", cell: (r) => optionCell(r, "vendor", r.profitVendor) },
@@ -160,7 +206,7 @@ const COLUMNS = {
     { label: "Trend X (popyt)", key: "trendChange", cell: demandCell },
   ],
   disenchant: [
-    { label: "Przedmiot", cell: (r) => td(r.name + (r.complete ? "" : "  *")) },
+    { label: "Przedmiot", cell: (r) => nameCell(r.name, r.complete ? "" : "  *") },
     { label: "Koszt (AH)", key: "cost", cell: (r) => td(money(r.cost), "num") },
     { label: "Rozbiór (EV)", cell: (r) => td(money(r.value), "num") },
     { label: "Zysk", key: "profit", cell: profitCell },
@@ -170,7 +216,7 @@ const COLUMNS = {
     { label: "Na AH", cell: (r) => td(r.qty == null ? "-" : String(r.qty), "num dim") },
   ],
   ah: [
-    { label: "Przedmiot", cell: (r) => td(r.name) },
+    { label: "Przedmiot", cell: (r) => nameCell(r.name) },
     { label: "Koszt (najniższa)", key: "cost", cell: (r) => td(money(r.cost), "num") },
     { label: "Typowa cena", cell: (r) => td(money(r.value), "num") },
     { label: "Zysk", key: "profit", cell: profitCell },
@@ -180,7 +226,7 @@ const COLUMNS = {
     { label: "Profesje", cell: (r) => td(r.professions.join(", "), "dim") },
   ],
   guide: [
-    { label: "Przedmiot", cell: (r) => td(r.name) },
+    { label: "Przedmiot", cell: (r) => nameCell(r.name) },
     { label: "Koszt (najniższa)", key: "cost", cell: (r) => td(money(r.cost), "num") },
     { label: "Typowa cena", cell: (r) => td(money(r.value), "num") },
     { label: "Potencjał", key: "profit", cell: profitCell },
@@ -385,7 +431,7 @@ function renderItems() {
   empty.textContent = rows.length ? "" : "Brak pasujących przedmiotów.";
   for (const r of rows.slice(0, 500)) {
     const opt = (x) => (x == null ? "-" : money(x));
-    tbody.append(el("tr", {}, td(r.name), td(money(r.last.low), "num"), td(opt(r.last.median), "num"),
+    tbody.append(el("tr", {}, nameCell(r.name), td(money(r.last.low), "num"), td(opt(r.last.median), "num"),
       td(opt(r.last.avg), "num"), td(String(r.last.qty ?? "-"), "num"), trendCell(r.tr)));
   }
 }
