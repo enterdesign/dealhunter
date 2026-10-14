@@ -1,10 +1,10 @@
-import { loadSavedVariables, makeContext, makeDisenchant, selectHouse } from "./datasource.js?v=1454e23d";
-import { kvSet, kvGet, kvDelete } from "./store.js?v=1454e23d";
-import { trend, formatMoney, formatPct, netProceeds } from "./engine.js?v=1454e23d";
+import { loadSavedVariables, makeContext, makeDisenchant, selectHouse } from "./datasource.js?v=dffa0ab9";
+import { kvSet, kvGet, kvDelete } from "./store.js?v=dffa0ab9";
+import { trend, formatMoney, formatPct, netProceeds } from "./engine.js?v=dffa0ab9";
 import {
   professionIndex, vendorFlips, craftFlips, disenchantFlips, ahFlips, resolveWatchlist, guideInvestments,
   filterRows, sortRows, runCheck, onlyProfitable, filterReliable, filterBop, NO_PROFESSION,
-} from "./opportunities.js?v=1454e23d";
+} from "./opportunities.js?v=dffa0ab9";
 
 const $ = (id) => document.getElementById(id);
 const MODE = document.body.dataset.mode || "tbc";

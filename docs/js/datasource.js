@@ -1,6 +1,6 @@
-import { parseSavedVariables } from "./luaparse.js?v=1454e23d";
-import { decodeCbor } from "./cbor.js?v=1454e23d";
-import { pricePoint } from "./engine.js?v=1454e23d";
+import { parseSavedVariables } from "./luaparse.js?v=dffa0ab9";
+import { decodeCbor } from "./cbor.js?v=dffa0ab9";
+import { pricePoint } from "./engine.js?v=dffa0ab9";
 
 // Zamienia zawartość pliku SavedVariables na model danych strony:
 // { source, items: Map(id -> history[]), known: Set(recipeId), scannedAt (sekundy) }
@@ -25,6 +25,14 @@ export function loadSavedVariables(text) {
   };
 }
 
+// Tabela Lua { [id] = wartość } parser zwraca jako tablicę (gdy klucze są kolejne od 1) albo obiekt.
+function luaIdMap(t) {
+  const out = new Map();
+  if (Array.isArray(t)) t.forEach((v, i) => { if (typeof v === "number") out.set(i + 1, v); });
+  else for (const [k, v] of Object.entries(t ?? {})) if (typeof v === "number") out.set(Number(k), v);
+  return out;
+}
+
 function fromDealHunter(db) {
   const items = new Map();
   let scannedAt = 0;
@@ -44,7 +52,9 @@ function fromDealHunter(db) {
   }
   // Zapis z podsumowań przeglądania (WoW Forever beta) ma tylko najniższą cenę i ilość, bez mediany i średniej.
   const noMedian = ![...items.values()].some((h) => h.some((p) => p.median != null));
-  return { source: "DealHunterAH", items, known, scannedAt, noMedian };
+  // Ceny u kupców odczytane z klienta gry mają pierwszeństwo przed danymi z katalogu.
+  const vendor = { sell: luaIdMap(db.vendor?.sell), buy: luaIdMap(db.vendor?.buy) };
+  return { source: "DealHunterAH", items, known, scannedAt, noMedian, vendor };
 }
 
 // Kontekst cenowy dla silnika. catalog: { items: {id: {name, vendorSell, vendorBuy, quality, ilvl}}, disenchant }
@@ -62,8 +72,8 @@ export function makeContext(model, catalog = {}) {
       const h = model.items.get(id);
       return h?.[h.length - 1]?.qty ?? null;
     },
-    vendorSell: (id) => items[id]?.vendorSell ?? null,
-    vendorBuy: (id) => catalog.vendors?.[id] ?? items[id]?.vendorBuy ?? null,
+    vendorSell: (id) => model.vendor?.sell?.get(id) ?? items[id]?.vendorSell ?? null,
+    vendorBuy: (id) => model.vendor?.buy?.get(id) ?? catalog.vendors?.[id] ?? items[id]?.vendorBuy ?? null,
     disenchant: (id) => catalog.disenchant?.(id) ?? null,
     deSample: (id) => catalog.disenchant?.sample?.(id) ?? null,
   };

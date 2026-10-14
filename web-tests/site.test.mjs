@@ -507,3 +507,12 @@ test("DealHunterAH: zapis bez mediany i średniej (podsumowania z Forever beta) 
   assert.equal(lowOnly.noMedian, true);
   assert.equal(makeContext(lowOnly, { items: {} }).ahPrice(100, "median"), 10);   // mediana = najniższa cena
 });
+
+test("DealHunterAH: ceny u kupców z gry mają pierwszeństwo przed katalogiem", () => {
+  const model = loadSavedVariables('DealHunterAHDB = { ["items"] = { ["100"] = { ["history"] = { { ["t"] = 5, ["low"] = 10, ["qty"] = 3 } } } }, ["vendor"] = { ["sell"] = { ["20744"] = 100, ["7"] = 0 }, ["buy"] = { ["3371"] = 20 } } }');
+  const ctx = makeContext(model, { items: { 20744: { vendorSell: 500 }, 5: { vendorSell: 9 } }, vendors: { 3371: 16 } });
+  assert.equal(ctx.vendorSell(20744), 100);   // z gry, nie 500 z katalogu
+  assert.equal(ctx.vendorSell(5), 9);         // bez zapisu z gry - katalog
+  assert.equal(ctx.vendorSell(7), 0);
+  assert.equal(ctx.vendorBuy(3371), 20);
+});

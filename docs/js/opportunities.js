@@ -1,7 +1,7 @@
 // Wyszukiwanie okazji na podstawie skanu AH. Wszystkie ceny w miedzi, wszystkie funkcje czyste (testowalne).
 //
 // model: { items: Map(id -> history[]) }   catalog: { items: {id: {name, vendorSell, bop, ...}} }
-import { trend, netProceeds, rankRecipes, disenchantStats, confidenceLabel, pricePoint, demandSignal } from "./engine.js?v=1454e23d";
+import { trend, netProceeds, rankRecipes, disenchantStats, confidenceLabel, pricePoint, demandSignal } from "./engine.js?v=dffa0ab9";
 
 export const NO_PROFESSION = "__none";
 

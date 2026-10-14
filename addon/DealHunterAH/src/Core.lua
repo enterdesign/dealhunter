@@ -12,7 +12,8 @@ local frame = CreateFrame("Frame")
 frame:RegisterEvent("ADDON_LOADED")
 -- Zdarzenia opcjonalne rejestrujemy w pcall: jeśli któregoś klient nie zna, addon i tak się załaduje.
 local EVENTS = { "AUCTION_ITEM_LIST_UPDATE", "REPLICATE_ITEM_LIST_UPDATE", "AUCTION_HOUSE_BROWSE_RESULTS_UPDATED",
-  "AUCTION_HOUSE_BROWSE_RESULTS_ADDED", "AUCTION_HOUSE_SHOW", "TRADE_SKILL_SHOW", "CRAFT_SHOW" }
+  "AUCTION_HOUSE_BROWSE_RESULTS_ADDED", "AUCTION_HOUSE_SHOW", "TRADE_SKILL_SHOW", "CRAFT_SHOW",
+    "MERCHANT_SHOW", "MERCHANT_UPDATE", "GET_ITEM_INFO_RECEIVED" }
 for _, event in ipairs(EVENTS) do
   pcall(frame.RegisterEvent, frame, event)
 end
@@ -79,6 +80,12 @@ local function addButton(kind)
   button:Show()
 end
 
+-- Po zapisaniu skanu AH sprawdzamy w kliencie ceny sprzedaży kupcowi dla tych przedmiotów.
+ns.onScanSaved = function()
+  local known, waiting = ns.Vendor.sweep()
+  say(("ceny u kupca: %d przedmiotów odczytanych z gry, %d oczekuje na dane."):format(known, waiting))
+end
+
 frame:SetScript("OnEvent", function(_, event, arg1)
   if spy and isAuctionEvent(event) then spy[event] = (spy[event] or 0) + 1 end
   if event == "ADDON_LOADED" and arg1 == ADDON then
@@ -91,6 +98,10 @@ frame:SetScript("OnEvent", function(_, event, arg1)
     ns.Scanner.onListUpdate("replicate")
   elseif event == "AUCTION_HOUSE_BROWSE_RESULTS_UPDATED" or event == "AUCTION_HOUSE_BROWSE_RESULTS_ADDED" then
     ns.Scanner.onListUpdate("browse")
+  elseif event == "MERCHANT_SHOW" or event == "MERCHANT_UPDATE" then
+    pcall(ns.Vendor.scanMerchant)
+  elseif event == "GET_ITEM_INFO_RECEIVED" then
+    ns.Vendor.onItemInfo(arg1)
   elseif event == "AUCTION_HOUSE_SHOW" then
     ns.ahOpened = (ns.ahOpened or 0) + 1
   elseif event == "TRADE_SKILL_SHOW" then
@@ -121,6 +132,8 @@ local function cmdStatus()
     table.sort(parts)
     say("znane receptury: " .. table.concat(parts, ", "))
   end
+  local sold, bought = ns.Vendor.count()
+  say(("ceny z gry: sprzedaż kupcowi %d, kupno u kupców %d. Kupno zapisuje się samo po otwarciu okna kupca; sprzedaż po skanie AH albo /dhah vendor."):format(sold, bought))
   say("plik zapisuje się przy /reload albo wylogowaniu: WTF/Account/<konto>/SavedVariables/DealHunterAH.lua")
 end
 
@@ -186,6 +199,9 @@ SlashCmdList["DEALHUNTERAH"] = function(msg)
   local cmd, arg = msg:match("^(%S*)%s*(.*)$")
   if cmd == "" or cmd == "status" then cmdStatus()
   elseif cmd == "item" then cmdItem(arg)
+  elseif cmd == "vendor" then
+    local known, waiting = ns.Vendor.sweep()
+    say(("ceny sprzedaży kupcowi: %d odczytanych z gry, %d oczekuje (wpisz /dhah vendor ponownie za chwilę)."):format(known, waiting))
   elseif cmd == "debug" then cmdDebug()
   elseif cmd == "spy" then cmdSpy()
   elseif cmd == "recipes" or cmd == "scan" then
@@ -198,7 +214,8 @@ SlashCmdList["DEALHUNTERAH"] = function(msg)
   elseif cmd == "reset" and arg == "yes" then
     DealHunterAHDB.items = {}
     DealHunterAHDB.known = {}
+    DealHunterAHDB.vendor = nil
     say("usunięto zapisane ceny i receptury.")
   elseif cmd == "reset" then say("to usunie wszystkie zapisane ceny i receptury. Potwierdź: /dhah reset yes")
-  else say("komendy: /dhah (status) | /dhah recipes (zapisz otwarte okno profesji) | /dhah item <link> | /dhah debug | /dhah spy | /dhah reset yes") end
+  else say("komendy: /dhah (status) | /dhah recipes (zapisz otwarte okno profesji) | /dhah vendor (ceny kupca z gry) | /dhah item <link> | /dhah debug | /dhah spy | /dhah reset yes") end
 end
