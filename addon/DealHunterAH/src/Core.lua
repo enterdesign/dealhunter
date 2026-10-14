@@ -37,7 +37,7 @@ local function cmdItem(arg)
     say("  brak zapisanych cen AH (zrób skan)")
   end
   if val then
-    say(("  vendor %s | AH netto %s | disenchant %s | najlepiej: %s"):format(
+    say(("  vendor %s | AH %s | disenchant %s | najlepiej: %s"):format(
       money(val.vendor), money(val.ah), money(val.disenchant), val.best))
   end
 end
@@ -47,7 +47,5 @@ SlashCmdList["DEALHUNTERAH"] = function(msg)
   local cmd, arg = msg:match("^(%S*)%s*(.*)$")
   if cmd == "item" then cmdItem(arg)
   elseif cmd == "" or cmd == "top" then ns.UI.toggle()
-  elseif cmd == "ah" and (arg == "faction" or arg == "neutral") then
-    DealHunterAHDB.ahType = arg; say("typ AH: " .. arg)
-  else say("komendy: /dhah (okno) | /dhah item <link> | /dhah ah faction|neutral") end
+  else say("komendy: /dhah (okno) | /dhah item <link>") end
 end

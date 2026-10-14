@@ -2,7 +2,9 @@ local _, ns = ...
 local Fees = {}
 ns.Fees = Fees
 
--- UWAGA: wartości domyślne do potwierdzenia w grze na TBC Anniversary.
+-- Prowizja i depozyt są na razie WYŁĄCZONE (net = cena). Włączenie: Fees.enabled = true.
+-- UWAGA: wartości poniżej do potwierdzenia w grze na TBC Anniversary.
+Fees.enabled = false
 Fees.CUT = { faction = 0.05, neutral = 0.15 }
 
 -- opts: ahType ("faction"|"neutral"), cutOverrides[itemId], itemId, deposit (miedź, stała kwota)
@@ -16,6 +18,7 @@ end
 
 -- Ile zostaje po sprzedaży za `price` (miedź).
 function Fees.net(price, opts)
+  if not Fees.enabled then return price end
   local net = price * (1 - Fees.cutRate(opts))
   if opts and opts.deposit then net = net - opts.deposit end
   return net

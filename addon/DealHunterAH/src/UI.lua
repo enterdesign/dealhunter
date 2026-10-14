@@ -37,8 +37,7 @@ function UI.refresh()
       includeIncomplete = state.incomplete, sortBy = state.sortBy,
       feeOpts = { ahType = DealHunterAHDB.ahType },
     })
-    frame.status:SetText(string.format("%d receptur  |  AH: %s  |  sortuj: %s",
-      #state.results, DealHunterAHDB.ahType, state.sortBy))
+    frame.status:SetText(string.format("%d receptur  |  sortuj: %s", #state.results, state.sortBy))
   end
   UI.update()
 end
@@ -90,7 +89,7 @@ local function showTooltip(row)
   if v then
     GameTooltip:AddLine(" ")
     GameTooltip:AddDoubleLine("Kupiec", F.money(v.vendor))
-    GameTooltip:AddDoubleLine("AH (netto)", F.money(v.ah))
+    GameTooltip:AddDoubleLine("AH", F.money(v.ah))
     GameTooltip:AddDoubleLine("Rozbiór", F.money(v.disenchant) .. (v.deIncomplete and " *" or ""))
     local item = DealHunterAHDB.items[r.recipe.produces]
     local tr = item and ns.Stats.trend(item.history)
@@ -145,12 +144,7 @@ local function build()
   c1:SetPoint("LEFT", dd, "RIGHT", -6, 2)
   local c2 = makeCheck(frame, "niekompletne", function() return state.incomplete end, function(v) state.incomplete = v end)
   c2:SetPoint("LEFT", c1, "RIGHT", 90, 0)
-  local ah = makeButton(frame, "AH: " .. (DealHunterAHDB.ahType or "faction"), 90, function(self)
-    DealHunterAHDB.ahType = DealHunterAHDB.ahType == "faction" and "neutral" or "faction"
-    self:SetText("AH: " .. DealHunterAHDB.ahType); UI.refresh()
-  end)
-  ah:SetPoint("LEFT", c2, "RIGHT", 90, 0)
-  makeButton(frame, "Odśwież", 70, UI.refresh):SetPoint("LEFT", ah, "RIGHT", 4, 0)
+  makeButton(frame, "Odśwież", 70, UI.refresh):SetPoint("LEFT", c2, "RIGHT", 90, 0)
 
   -- nagłówki kolumn (klik = sortowanie)
   for _, col in ipairs(COLS) do

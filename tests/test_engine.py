@@ -97,14 +97,20 @@ class FeesTests(unittest.TestCase):
     def setUp(self):
         self.lua, self.ns = load_engine()
 
+    def test_disabled_by_default(self):
+        F = self.ns.Fees
+        self.assertEqual(F.net(1000, self.lua.table(ahType="neutral", deposit=50)), 1000)
+
     def test_cut_by_ah_type_and_override(self):
         F = self.ns.Fees
+        F.enabled = True
         self.assertAlmostEqual(F.net(1000, self.lua.table(ahType="faction")), 950)
         self.assertAlmostEqual(F.net(1000, self.lua.table(ahType="neutral")), 850)
         o = self.lua.table(itemId=7, cutOverrides=self.lua.table_from({7: 0.0}))
         self.assertAlmostEqual(F.net(1000, o), 1000)
 
     def test_deposit_subtracted(self):
+        self.ns.Fees.enabled = True
         self.assertAlmostEqual(self.ns.Fees.net(1000, self.lua.table(deposit=50)), 900)
 
 
@@ -113,12 +119,12 @@ class ValuationTests(unittest.TestCase):
         self.lua, self.ns = load_engine()
 
     def test_picks_best_of_three(self):
-        # item 1: vendor 100, AH 1000 (netto 950), DE: 0.5 * 2 szt. materiału 2 po 600 => 0.5*2*570=570
+        # item 1: vendor 100, AH 1000 (bez prowizji), DE: 0.5 * 2 szt. materiału 2 po 600 => 600
         ctx = ctx_from(self.lua, {1: 1000, 2: 600}, vendor_sell={1: 100}, de={1: [(2, 2, 0.5)]})
         v = self.ns.Valuation.itemValue(1, ctx)
         self.assertEqual(v.best, "ah")
-        self.assertAlmostEqual(v.ah, 950)
-        self.assertAlmostEqual(v.disenchant, 570)
+        self.assertAlmostEqual(v.ah, 1000)
+        self.assertAlmostEqual(v.disenchant, 600)
         self.assertEqual(v.vendor, 100)
 
     def test_disenchant_wins_and_incomplete_flag(self):
@@ -146,8 +152,8 @@ class RecipeTests(unittest.TestCase):
         ctx = ctx_from(self.lua, prices)
         res = self.ns.Recipes.evaluate(self.recipe(1, 99, [(10, 4)]), ctx)
         self.assertEqual(res.cost, 400)
-        self.assertAlmostEqual(res.value, 950)
-        self.assertAlmostEqual(res.profit, 550)
+        self.assertAlmostEqual(res.value, 1000)
+        self.assertAlmostEqual(res.profit, 600)
         self.assertTrue(res.complete)
 
     def test_vendor_reagent_cheaper_than_ah(self):
@@ -196,8 +202,8 @@ class SortTests(RecipeTests):
         prices = {(10, "low"): 100, (11, "low"): 1000, (98, "median"): 400, (99, "median"): 3000}
         ctx = ctx_from(self.lua, prices)
         recipes = self.lua.table_from([
-            self.recipe(1, 98, [(10, 1)]),    # koszt 100, wartość 380 -> roi 2.8
-            self.recipe(2, 99, [(11, 1)]),    # koszt 1000, wartość 2850 -> roi 1.85, zysk wyższy
+            self.recipe(1, 98, [(10, 1)]),    # koszt 100, wartość 400 -> roi 3
+            self.recipe(2, 99, [(11, 1)]),    # koszt 1000, wartość 3000 -> roi 2, zysk wyższy
         ])
         by = lambda k: [self.ns.Recipes.rank(recipes, ctx, self.lua.table(sortBy=k))[i].recipe.id for i in (1, 2)]
         self.assertEqual(by("profit"), [2, 1])

@@ -1,7 +1,7 @@
 # DealHunter AH
 
 Addon do WoW TBC Anniversary (docelowo też Classic / Forever) liczący opłacalność przedmiotów
-i receptur: vendor / disenchant / AH (z prowizją), min / mediana / średnia i trend cen.
+i receptur: vendor / disenchant / AH (bez prowizji i depozytu (na razie wyłączone)), min / mediana / średnia i trend cen.
 Nie automatyzuje żadnych akcji - ceny zbiera z aukcji, które pokazuje gra po Twoim skanie.
 
 - `addon/DealHunterAH/` - addon (Lua); skopiuj do `Interface/AddOns/`.
