@@ -79,6 +79,21 @@ class ScannerTests(unittest.TestCase):
         q = self.history(200)[1]
         self.assertEqual((q["low"], q["qty"]), (100, 5))    # cena za sztukę: 500 / 5
 
+    def test_refresh_after_full_scan_is_not_reprocessed_or_reported(self):
+        listings(self.lua, [(100, 1000, 1, "a"), (100, 2000, 1, "b")])
+        self.run_scan()
+        self.assertEqual(len(list(self.lua.eval("_printed").values())), 1)
+        self.lua.globals()._now = 1700000000 + 30                  # gra odświeża listę po skanie (ten sam skan)
+        self.run_scan()
+        self.run_scan()
+        self.assertEqual(len(list(self.lua.eval("_printed").values())), 1)   # bez kolejnych komunikatów
+        self.assertEqual(len(self.history(100)), 1)
+        self.lua.globals()._now = 1700000000 + 3600                # po godzinie ta sama liczba ofert = nowy skan
+        listings(self.lua, [(100, 3000, 1, "a"), (100, 4000, 1, "b")])
+        self.run_scan()
+        self.assertEqual(len(list(self.lua.eval("_printed").values())), 2)
+        self.assertEqual(self.history(100)[2]["low"], 3000)
+
     def test_partial_list_is_ignored(self):
         # zwykłe wyszukiwanie: gra pokazuje 50 z 400 wyników (jedna strona)
         listings(self.lua, [(100, 1000, 1, "a")] * 50)
