@@ -32,8 +32,8 @@ Analizę robi strona. Addon niczego nie kupuje, nie wystawia i nie wysyła zapyt
 
 Instalacja i użycie:
 1. Pobierz `docs/DealHunterAH.zip` (link jest też na stronie) i rozpakuj do `World of Warcraft/<wersja>/Interface/AddOns/`
-   (powstanie folder `DealHunterAH`). Numer `Interface` w `.toc` to 20506; jeśli addon nie widać na liście, sprawdź build
-   komendą `/dump (select(4, GetBuildInfo()))` albo zaznacz "Load out of date AddOns".
+   (powstanie folder `DealHunterAH`). Numer `Interface` w `.toc` to `20506` (TBC Anniversary 2.5.6) i `16001` (WoW Forever 1.60.1). Jeśli addon
+   jest "incompatible", sprawdź build komendą `/dump (select(4, GetBuildInfo()))` i zaznacz "Load out of date AddOns".
 2. Zrób pełny skan AH Auctionatorem. W czacie pojawi się "zapisano ceny N przedmiotów".
 3. W oknie każdej profesji kliknij "Zapisz receptury". Pojawi się "zapisano N nowych receptur".
 4. Wpisz `/reload` (plik zapisuje się przy `/reload` albo wylogowaniu) i wgraj na stronie
