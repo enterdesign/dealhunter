@@ -238,7 +238,9 @@ class FilesTests(unittest.TestCase):
         listed = {line.strip().replace("\\", "/") for line in toc.splitlines() if line.strip().startswith("src")}
         self.assertEqual(listed, {f"src/{f.name}" for f in SRC.glob("*.lua")})
         self.assertIn("## SavedVariables: DealHunterAHDB", toc)
-        self.assertRegex(toc, r"## Interface: \d{5}")
+        self.assertRegex(toc, r"## Interface: \d{5}(, \d{5})*")
+        self.assertIn("20506", toc)   # TBC Anniversary 2.5.6
+        self.assertIn("16001", toc)   # WoW Forever 1.60.1
 
 
 if __name__ == "__main__":
