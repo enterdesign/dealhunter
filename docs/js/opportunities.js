@@ -1,7 +1,7 @@
 // Wyszukiwanie okazji na podstawie skanu AH. Wszystkie ceny w miedzi, wszystkie funkcje czyste (testowalne).
 //
 // model: { items: Map(id -> history[]) }   catalog: { items: {id: {name, vendorSell, bop, ...}} }
-import { trend, netProceeds, rankRecipes, disenchantStats, confidenceLabel, pricePoint } from "./engine.js?v=982697e0";
+import { trend, netProceeds, rankRecipes, disenchantStats, confidenceLabel, pricePoint } from "./engine.js?v=0361f679";
 
 export const NO_PROFESSION = "__none";
 
@@ -63,6 +63,10 @@ export function craftFlips(recipes, ctx, opts = {}) {
       use: r.use, known: r.known, complete: r.complete, professions: [r.recipe.profession], result: r,
       qty: ctx.ahQty?.(r.recipe.produces) ?? null, ingredients,
       options: { ah: times(vi.ah), vendor: times(vi.vendor), disenchant: times(vi.disenchant) },
+      // zysk albo strata dla każdej opcji osobno (wartość opcji − koszt składników)
+      profitAh: vi.ah == null ? null : times(vi.ah) - r.cost,
+      profitVendor: vi.vendor == null ? null : times(vi.vendor) - r.cost,
+      profitDisenchant: vi.disenchant == null ? null : times(vi.disenchant) - r.cost,
       sd: r.use === "disenchant" && vi.deStats ? vi.deStats.sd * qty : null,
     });
   });

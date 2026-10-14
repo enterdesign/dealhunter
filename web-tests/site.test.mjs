@@ -275,6 +275,8 @@ test("receptura: składniki z cenami i źródłem oraz wartość wyrobu w trzech
   assert.equal(r.cost, 2 * 100 + 3 * 40);
   assert.deepEqual(r.options, { ah: 600, vendor: 240, disenchant: 500 }); // AH 300*2, kupiec 120*2, EV 0.5*500*2
   assert.equal(r.use, "ah"); assert.equal(r.profit, 600 - 320);
+  // osobny zysk albo strata dla każdej opcji
+  assert.equal(r.profitAh, 600 - 320); assert.equal(r.profitVendor, 240 - 320); assert.equal(r.profitDisenchant, 500 - 320);
   assert.equal(r.sd, null); // najlepsza opcja to nie rozbiór
 });
 
