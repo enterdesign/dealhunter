@@ -1,9 +1,9 @@
-import { loadSavedVariables, makeContext, makeDisenchant, selectHouse } from "./datasource.js";
-import { trend, formatMoney, formatPct, netProceeds } from "./engine.js";
+import { loadSavedVariables, makeContext, makeDisenchant, selectHouse } from "./datasource.js?v=e383d2cd";
+import { trend, formatMoney, formatPct, netProceeds } from "./engine.js?v=e383d2cd";
 import {
   professionIndex, vendorFlips, craftFlips, disenchantFlips, ahFlips, resolveWatchlist, guideInvestments,
   filterRows, sortRows, runCheck, onlyProfitable, filterReliable, NO_PROFESSION,
-} from "./opportunities.js";
+} from "./opportunities.js?v=e383d2cd";
 
 const $ = (id) => document.getElementById(id);
 const MODE = document.body.dataset.mode || "tbc";
