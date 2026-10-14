@@ -1,6 +1,6 @@
-import { parseSavedVariables } from "./luaparse.js?v=dc31e9d0";
-import { decodeCbor } from "./cbor.js?v=dc31e9d0";
-import { pricePoint } from "./engine.js?v=dc31e9d0";
+import { parseSavedVariables } from "./luaparse.js?v=1454e23d";
+import { decodeCbor } from "./cbor.js?v=1454e23d";
+import { pricePoint } from "./engine.js?v=1454e23d";
 
 // Zamienia zawartość pliku SavedVariables na model danych strony:
 // { source, items: Map(id -> history[]), known: Set(recipeId), scannedAt (sekundy) }
@@ -42,7 +42,9 @@ function fromDealHunter(db) {
     if (Array.isArray(set)) set.forEach((v, i) => { if (v) known.add(i + 1); });
     else for (const id of Object.keys(set)) known.add(Number(id));
   }
-  return { source: "DealHunterAH", items, known, scannedAt };
+  // Zapis z podsumowań przeglądania (WoW Forever beta) ma tylko najniższą cenę i ilość, bez mediany i średniej.
+  const noMedian = ![...items.values()].some((h) => h.some((p) => p.median != null));
+  return { source: "DealHunterAH", items, known, scannedAt, noMedian };
 }
 
 // Kontekst cenowy dla silnika. catalog: { items: {id: {name, vendorSell, vendorBuy, quality, ilvl}}, disenchant }

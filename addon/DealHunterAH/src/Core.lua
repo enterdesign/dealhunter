@@ -11,7 +11,8 @@ end
 local frame = CreateFrame("Frame")
 frame:RegisterEvent("ADDON_LOADED")
 -- Zdarzenia opcjonalne rejestrujemy w pcall: jeśli któregoś klient nie zna, addon i tak się załaduje.
-local EVENTS = { "AUCTION_ITEM_LIST_UPDATE", "REPLICATE_ITEM_LIST_UPDATE", "AUCTION_HOUSE_SHOW", "TRADE_SKILL_SHOW", "CRAFT_SHOW" }
+local EVENTS = { "AUCTION_ITEM_LIST_UPDATE", "REPLICATE_ITEM_LIST_UPDATE", "AUCTION_HOUSE_BROWSE_RESULTS_UPDATED",
+  "AUCTION_HOUSE_BROWSE_RESULTS_ADDED", "AUCTION_HOUSE_SHOW", "TRADE_SKILL_SHOW", "CRAFT_SHOW" }
 for _, event in ipairs(EVENTS) do
   pcall(frame.RegisterEvent, frame, event)
 end
@@ -35,7 +36,9 @@ end
 -- Skan receptur uruchamia użytkownik: przycisk w oknie profesji albo /dhah recipes.
 local function scanRecipes(kind)
   if kind == "craft" then return ns.Known.scanCraft() end
-  return ns.Known.scanTradeSkill()
+  local added, prof, total = ns.Known.scanTradeSkill()
+  if prof then return added, prof, total end
+  return ns.Known.scanModern()
 end
 
 local function addButton(parent, name, kind)
@@ -57,10 +60,12 @@ frame:SetScript("OnEvent", function(_, event, arg1)
     ns.Scanner.onListUpdate("classic")
   elseif event == "REPLICATE_ITEM_LIST_UPDATE" then
     ns.Scanner.onListUpdate("replicate")
+  elseif event == "AUCTION_HOUSE_BROWSE_RESULTS_UPDATED" or event == "AUCTION_HOUSE_BROWSE_RESULTS_ADDED" then
+    ns.Scanner.onListUpdate("browse")
   elseif event == "AUCTION_HOUSE_SHOW" then
     ns.ahOpened = (ns.ahOpened or 0) + 1
   elseif event == "TRADE_SKILL_SHOW" then
-    pcall(addButton, _G.TradeSkillFrame, "DealHunterAHRecipesButton", "tradeskill")
+    pcall(addButton, _G.TradeSkillFrame or _G.ProfessionsFrame, "DealHunterAHRecipesButton", "tradeskill")
   elseif event == "CRAFT_SHOW" then
     pcall(addButton, _G.CraftFrame, "DealHunterAHCraftButton", "craft")
   end
@@ -96,11 +101,20 @@ local function cmdDebug()
     type(GetNumAuctionItems), type(GetAuctionItemInfo), type(QueryAuctionItems)))
   say(("API replicate: C_AuctionHouse=%s, GetNumReplicateItems=%s, GetReplicateItemInfo=%s, ReplicateItems=%s"):format(
     type(ah), type(ah and ah.GetNumReplicateItems), type(ah and ah.GetReplicateItemInfo), type(ah and ah.ReplicateItems)))
-  say(("zdarzenia list aukcji: klasyczne %d, replicate %d; otwarć AH: %d"):format(
-    ns.Scanner.events.classic, ns.Scanner.events.replicate, ns.ahOpened or 0))
+  say(("API browse: GetBrowseResults=%s, HasFullBrowseResults=%s"):format(
+    type(ah and ah.GetBrowseResults), type(ah and ah.HasFullBrowseResults)))
+  local tui = C_TradeSkillUI
+  say(("profesje: klasyczne GetNumTradeSkills=%s, nowe C_TradeSkillUI=%s (GetAllRecipeIDs=%s, GetRecipeInfo=%s)"):format(
+    type(GetNumTradeSkills), type(tui), type(tui and tui.GetAllRecipeIDs), type(tui and tui.GetRecipeInfo)))
+  say(("zdarzenia list aukcji: klasyczne %d, replicate %d, browse %d; otwarć AH: %d"):format(
+    ns.Scanner.events.classic, ns.Scanner.events.replicate, ns.Scanner.events.browse, ns.ahOpened or 0))
   say(("ostatnia lista: %s; pominiętych częściowych: %d"):format(ns.Scanner.lastInfo, ns.Scanner.ignored))
   if GetNumAuctionItems then say(("GetNumAuctionItems(\"list\") teraz: %s"):format(table.concat({ tostring((GetNumAuctionItems("list"))), tostring(select(2, GetNumAuctionItems("list"))) }, " / "))) end
   if ah and ah.GetNumReplicateItems then say(("GetNumReplicateItems() teraz: %s"):format(tostring(ah.GetNumReplicateItems()))) end
+  if ah and ah.GetBrowseResults then
+    local results = ah.GetBrowseResults()
+    say(("GetBrowseResults() teraz: %d wyników"):format(results and #results or 0))
+  end
   if spy then
     local names = {}
     for name, n in pairs(spy) do names[#names + 1] = ("%s=%d"):format(name, n) end
@@ -146,7 +160,7 @@ SlashCmdList["DEALHUNTERAH"] = function(msg)
   elseif cmd == "spy" then cmdSpy()
   elseif cmd == "recipes" or cmd == "scan" then
     -- zapisuje otwarte okno profesji (tradeskill i/lub craft)
-    local added, prof, total = ns.Known.scanTradeSkill()
+    local added, prof, total = scanRecipes("tradeskill")
     if prof then reportKnown(added, prof, total) end
     local cAdded, cProf, cTotal = ns.Known.scanCraft()
     if cProf then reportKnown(cAdded, cProf, cTotal) end

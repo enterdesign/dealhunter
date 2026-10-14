@@ -44,7 +44,8 @@ Instalacja i użycie:
 Komendy: `/dhah` (status), `/dhah recipes`, `/dhah item <link>`, `/dhah reset yes`.
 Diagnostyka, gdy po skanie nic się nie zapisuje: `/dhah debug` (jakie API aukcji ma klient, ile zdarzeń list widziano, ostatnia lista)
 i `/dhah spy` (włącz, zrób skan, potem `/dhah debug` pokaże, jakie zdarzenia aukcji faktycznie przychodzą; wyłącz tą samą komendą).
-Addon obsługuje klasyczne API aukcji (TBC, Classic Era) i nowsze "replicate" (`C_AuctionHouse`).
+Addon obsługuje trzy interfejsy aukcji: klasyczny (TBC, Classic Era), "replicate" i "browse" (WoW Forever beta; Auctionator w trybie
+"summary mode" daje wtedy tylko najniższą cenę i ilość na przedmiot). Okno profesji: klasyczne i nowe (`C_TradeSkillUI`).
 Po zmianach w `addon/` uruchom `python3 tools/pack_addon.py`.
 
 ## Tryby gry
