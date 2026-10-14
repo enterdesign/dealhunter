@@ -21,21 +21,26 @@ export function summarize(listings) {
   return { low: rows[0].unit, median, avg: sum / total, qty: total, n: rows.length };
 }
 
+// Cena z punktu historii dla wybranego trybu (low/median/avg). Źródła, które nie mają mediany ani średniej
+// (np. Auctionator), dają w zamian najniższą cenę.
+export const pricePoint = (p, mode) => p?.[mode] ?? p?.low ?? null;
+
 // history: [{t, low, median, avg}] rosnąco po t (t w sekundach).
 export function trend(history, { days = 7, flat = 0.05, field = "median" } = {}) {
   if (!history.length) return null;
   const cutoff = history[history.length - 1].t - days * 86400;
-  const pts = history.filter((h) => h.t >= cutoff && h[field] != null);
+  const pts = history.filter((h) => h.t >= cutoff && pricePoint(h, field) != null);
   if (pts.length < 3) return null;
-  const base = pts.slice(0, -1).reduce((s, p) => s + p[field], 0) / (pts.length - 1);
-  const current = pts[pts.length - 1][field];
+  const base = pts.slice(0, -1).reduce((s, p) => s + pricePoint(p, field), 0) / (pts.length - 1);
+  const current = pricePoint(pts[pts.length - 1], field);
   const change = current / base - 1;
 
   const t0 = pts[0].t;
   let sx = 0, sy = 0, sxx = 0, sxy = 0;
   for (const p of pts) {
     const x = (p.t - t0) / 86400;
-    sx += x; sy += p[field]; sxx += x * x; sxy += x * p[field];
+    const y = pricePoint(p, field);
+    sx += x; sy += y; sxx += x * x; sxy += x * y;
   }
   const n = pts.length;
   const den = n * sxx - sx * sx;

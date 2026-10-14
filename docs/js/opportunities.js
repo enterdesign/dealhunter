@@ -1,7 +1,7 @@
 // Wyszukiwanie okazji na podstawie skanu AH. Wszystkie ceny w miedzi, wszystkie funkcje czyste (testowalne).
 //
 // model: { items: Map(id -> history[]) }   catalog: { items: {id: {name, vendorSell, bop, ...}} }
-import { trend, netProceeds, rankRecipes, disenchantStats, confidenceLabel } from "./engine.js";
+import { trend, netProceeds, rankRecipes, disenchantStats, confidenceLabel, pricePoint } from "./engine.js";
 
 export const NO_PROFESSION = "__none";
 
@@ -36,7 +36,7 @@ export function vendorFlips(model, catalog, idx, { buyMode = "low" } = {}) {
   const out = [];
   for (const [id, h] of model.items) {
     const sell = catalog.items?.[id]?.vendorSell;
-    const cost = last(h)[buyMode];
+    const cost = pricePoint(last(h), buyMode);
     if (!sell || cost == null) continue;
     const profit = sell - cost;
     out.push(row({ kind: "vendor", id, name: nameOf(catalog, id), cost, value: sell, profit,
@@ -50,6 +50,7 @@ export function craftFlips(recipes, ctx, opts) {
   return rankRecipes(recipes, ctx, opts).map((r) => row({
     kind: "craft", id: r.recipe.id, name: r.recipe.name, cost: r.cost, value: r.value, profit: r.profit,
     use: r.use, known: r.known, complete: r.complete, professions: [r.recipe.profession], result: r,
+    qty: ctx.ahQty?.(r.recipe.produces) ?? null,
   }));
 }
 
@@ -58,7 +59,7 @@ export function craftFlips(recipes, ctx, opts) {
 export function disenchantFlips(model, catalog, ctx, { buyMode = "low", sellMode = "median", fee } = {}) {
   const out = [];
   for (const [id, h] of model.items) {
-    const cost = last(h)[buyMode];
+    const cost = pricePoint(last(h), buyMode);
     const outcomes = ctx.disenchant?.(id);
     if (cost == null || !outcomes) continue;
     const stats = disenchantStats(outcomes, (m) => {
@@ -81,7 +82,7 @@ export function ahFlips(model, catalog, idx, { minPoints = 3, minPrice = 100,
   const out = [];
   for (const [id, h] of model.items) {
     if (h.length < minPoints || catalog.items?.[id]?.bop) continue;
-    const refs = h.slice(0, -1).map((p) => p[sellMode]).filter((x) => x != null).sort((a, b) => a - b);
+    const refs = h.slice(0, -1).map((p) => pricePoint(p, sellMode)).filter((x) => x != null).sort((a, b) => a - b);
     const cost = last(h).low;
     if (!refs.length || cost == null) continue;
     const ref = refs[Math.floor((refs.length - 1) / 2)];
@@ -122,8 +123,8 @@ export function guideInvestments(watch, model, catalog, { sellMode = "median", f
     if (!h || seen.has(`${w.id}:${w.profession}`)) continue;
     seen.add(`${w.id}:${w.profession}`);
     const cost = last(h).low;
-    const refs = h.slice(0, -1).map((p) => p[sellMode]).filter((x) => x != null).sort((a, b) => a - b);
-    const ref = refs.length ? refs[Math.floor((refs.length - 1) / 2)] : last(h)[sellMode];
+    const refs = h.slice(0, -1).map((p) => pricePoint(p, sellMode)).filter((x) => x != null).sort((a, b) => a - b);
+    const ref = refs.length ? refs[Math.floor((refs.length - 1) / 2)] : pricePoint(last(h), sellMode);
     if (cost == null || ref == null) continue;
     const profit = netProceeds(ref, fee) - cost;
     out.push(row({ kind: "guide", id: w.id, name: w.name, cost, value: ref, profit, qty: last(h).qty,
@@ -156,3 +157,18 @@ export function runCheck(check, { recipes, model, catalog, ctx, opts = {} }) {
 }
 
 export const onlyProfitable = (rows) => rows.filter((r) => r.profit > 0);
+
+// Odsiewa wyniki, którym nie ufamy: wyrób z mniejszą liczbą ofert na AH niż minQty oraz zysk z ceny z AH
+// powyżej maxRoi (np. 500 = 500%), typowy dla pojedynczych absurdalnych ofert. Wartość 0 wyłącza dany próg.
+// Rozbiór i flipy do vendora liczą się z płynnych cen, więc nie są odsiewane. Zwraca {rows, hidden}.
+export function filterReliable(rows, { minQty = 0, maxRoi = 0 } = {}) {
+  let hidden = 0;
+  const kept = rows.filter((r) => {
+    const fromAh = r.kind === "ah" || r.kind === "guide" || (r.kind === "craft" && r.use === "ah");
+    const thin = minQty > 0 && r.kind === "craft" && r.use === "ah" && (r.qty ?? 0) < minQty;
+    const suspicious = maxRoi > 0 && fromAh && r.roi != null && r.roi * 100 > maxRoi;
+    if (thin || suspicious) { hidden++; return false; }
+    return true;
+  });
+  return { rows: kept, hidden };
+}

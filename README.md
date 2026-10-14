@@ -1,6 +1,7 @@
 # DealHunter AH
 
-Strona (GitHub Pages) do zarabiania golda na aukcjach WoW. Wczytujesz plik SavedVariables ze skanem AH,
+Strona (GitHub Pages) do zarabiania golda na aukcjach WoW. Wczytujesz plik SavedVariables ze skanem AH
+(`Auctionator.lua` albo `DealHunterAH.lua` z naszego addona),
 a strona liczy lokalnie w przeglądarce (nic nie jest wysyłane na serwer):
 
 - **Flipy do vendora** - kup na AH taniej, niż płaci kupiec.
@@ -11,6 +12,12 @@ a strona liczy lokalnie w przeglądarce (nic nie jest wysyłane na serwer):
 Wszystko filtrowane po profesji i sortowane po zysku, koszcie i ROI. Zakładka **Strategie** zawiera guide
 (własnymi słowami, ze źródłami i oceną ich wiarygodności) dla wszystkich profesji.
 Prowizja i depozyt AH są domyślnie wyłączone.
+
+## Źródła skanu
+- **Auctionator** (`Auctionator.lua`): baza cen jest zapisana jako binarny napis CBOR; strona go dekoduje (`docs/js/cbor.js`).
+  Auctionator zapisuje tylko najniższe ceny dzienne i ilość (mediana i średnia są niedostępne, używana jest najniższa cena).
+  Historia obejmuje dni, w których robiłeś skany, więc flipy według historii poprawiają się z każdym kolejnym skanem.
+- **Addon DealHunterAH**: zapisuje też medianę i średnią (niesprawdzony w grze).
 
 ## Tryby gry
 Strona główna (`docs/index.html`) wybiera tryb. Dostępny: **TBC Anniversary** (`docs/tbc/`, dane w `docs/data/tbc/`).
