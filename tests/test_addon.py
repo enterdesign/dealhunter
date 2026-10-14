@@ -11,7 +11,8 @@ DealHunterAHDB = { items = {}, known = {} }
 _now = 1700000000
 function time() return _now end
 _auction = {}
-function GetNumAuctionItems(kind) return #_auction end
+_total = nil
+function GetNumAuctionItems(kind) return #_auction, _total or #_auction end
 function GetAuctionItemInfo(kind, i)
   local a = _auction[i]
   return a.name or "x", nil, a.count, 1, nil, nil, nil, 0, 0, a.buyout, 0, nil, nil, a.owner, nil, nil, a.itemId, true
@@ -54,24 +55,51 @@ class ScannerTests(unittest.TestCase):
     def setUp(self):
         self.lua, self.ns = load()
 
-    def flush(self):
+    def run_scan(self):
+        """Symuluje zdarzenie listy aukcji i upływ ciszy (timer)."""
+        self.lua.execute("_timers = {}")
         self.ns.Scanner.onListUpdate()
+        self.ns.Scanner.onListUpdate()                                 # kolejne zdarzenia nie dodają timerów
         self.assertEqual(len(self.lua.eval("_timers")), 1)
-        return self.ns.Scanner.flush()
+        self.ns.Scanner.process()
+
+    def count(self):
+        return len(list(self.lua.eval("DealHunterAHDB.items").keys()))   # len() dałoby 0 dla rzadkich kluczy
 
     def history(self, item):
         return self.lua.eval("DealHunterAHDB.items")[item]["history"]
 
     def test_records_low_median_avg_qty(self):
         listings(self.lua, [(100, 1000, 1, "a"), (100, 2000, 1, "b"), (100, 9000, 1, "c"), (200, 500, 5, "a")])
-        self.assertEqual(self.flush(), 2)
+        self.run_scan()
+        self.assertEqual(self.count(), 2)
         p = self.history(100)[1]
         self.assertEqual((p["low"], p["median"], p["qty"]), (1000, 2000, 3))
         self.assertAlmostEqual(p["avg"], 4000)
         q = self.history(200)[1]
         self.assertEqual((q["low"], q["qty"]), (100, 5))    # cena za sztukę: 500 / 5
 
-    def test_same_list_event_twice_does_not_double_count(self):
+    def test_partial_list_is_ignored(self):
+        # zwykłe wyszukiwanie: gra pokazuje 50 z 400 wyników (jedna strona)
+        listings(self.lua, [(100, 1000, 1, "a")] * 50)
+        self.lua.globals()._total = 400
+        self.run_scan()
+        self.assertEqual(self.count(), 0)
+        self.assertEqual(self.ns.Scanner.ignored, 1)
+
+    def test_complete_small_result_set_is_recorded(self):
+        listings(self.lua, [(100, 1000, 1, "a"), (100, 1500, 1, "b")])   # wszystkie wyniki naraz
+        self.run_scan()
+        self.assertEqual(self.history(100)[1]["qty"], 2)
+        self.assertEqual(self.ns.Scanner.ignored, 0)
+
+    def test_full_scan_with_larger_total_is_recorded(self):
+        listings(self.lua, [(i % 50 + 1, 100 + i, 1, "s%d" % i) for i in range(5000)])
+        self.lua.globals()._total = 60000                                   # partia >= próg pełnego skanu
+        self.run_scan()
+        self.assertEqual(self.count(), 50)
+
+    def test_same_list_collected_twice_does_not_double_count(self):
         listings(self.lua, [(100, 1000, 1, "a"), (100, 1000, 1, "a")])   # dwie identyczne oferty
         self.ns.Scanner.collect()
         self.ns.Scanner.collect()                                         # ta sama lista jeszcze raz
@@ -80,21 +108,23 @@ class ScannerTests(unittest.TestCase):
 
     def test_identical_offers_without_owner_are_kept(self):
         listings(self.lua, [(100, 1000, 1, None)] * 3)
-        self.flush()
+        self.run_scan()
         self.assertEqual(self.history(100)[1]["qty"], 3)
 
     def test_ignores_bid_only_and_empty(self):
         listings(self.lua, [(100, 0, 1, "a"), (100, 500, 0, "a")])
-        self.assertEqual(self.flush(), 0)
-        self.assertEqual(len(self.lua.eval("DealHunterAHDB.items")), 0)
+        self.run_scan()
+        self.assertEqual(self.count(), 0)
+        listings(self.lua, [])
+        self.run_scan()
+        self.assertEqual(self.count(), 0)
 
     def test_buffer_cleared_after_flush(self):
         listings(self.lua, [(100, 1000, 1, "a")])
-        self.flush()
+        self.run_scan()
         self.lua.globals()._now = 1700000000 + 7200
         listings(self.lua, [(100, 3000, 1, "a")])
-        self.lua.execute("_timers = {}")
-        self.flush()
+        self.run_scan()
         h = self.history(100)
         self.assertEqual((h[1]["low"], h[2]["low"]), (1000, 3000))   # drugi skan nie miesza się z pierwszym
         self.assertEqual(h[2]["qty"], 1)
@@ -110,6 +140,13 @@ class KnownTests(unittest.TestCase):
 
     def known(self):
         return {k: sorted(v.keys()) for k, v in self.lua.eval("DealHunterAHDB.known").items()}
+
+    def test_returns_profession_and_total(self):
+        trade(self.lua, "Alchemy", [("easy", "|Henchant:1|h"), ("easy", "|Henchant:2|h")])
+        added, prof, total = self.ns.Known.scanTradeSkill()
+        self.assertEqual((added, prof, total), (2, "Alchemy", 2))
+        added, prof, total = self.ns.Known.scanTradeSkill()    # drugi raz: nic nowego, ale profesja i suma są znane
+        self.assertEqual((added, prof, total), (0, "Alchemy", 2))
 
     def test_scan_skips_headers_and_parses_ids(self):
         trade(self.lua, "Blacksmithing", [

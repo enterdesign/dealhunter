@@ -2,19 +2,36 @@ local _, ns = ...
 local Scanner = {}
 ns.Scanner = Scanner
 
--- Zbiera aukcje, które gra pokazuje po TWOIM skanie lub wyszukiwaniu (także tym z Auctionatora).
+-- Zbiera aukcje, które gra pokazuje po TWOIM skanie (zalecany: pełny skan Auctionatora, "GetAll").
 -- Nie wysyła zapytań i niczego nie kupuje ani nie wystawia.
--- Po krótkiej ciszy (FLUSH_DELAY) zapisuje do historii najniższą cenę, medianę, średnią i ilość każdego przedmiotu.
+--
+-- Zapisujemy tylko KOMPLETNE listy: zwykłe wyszukiwanie pokazuje jedną stronę wyników, a statystyki z jednej
+-- strony byłyby mylące. Lista jest kompletna, gdy gra pokazuje wszystkie wyniki naraz (partia == całość) albo
+-- jest to pełny skan (bardzo duża partia). Po krótkiej ciszy zapisujemy najniższą cenę, medianę, średnią
+-- i ilość każdego przedmiotu do historii.
 local buffer = {}   -- buffer[itemId][klucz oferty] = { unit = cena za sztukę, qty = ilość }
 local pending = false
 Scanner.FLUSH_DELAY = 3
+Scanner.FULL_SCAN_MIN = 5000   -- tyle ofert w jednej partii uznajemy za pełny skan
+Scanner.ignored = 0            -- ile częściowych list pominięto (do /dhah status)
 
--- Odczytuje całą listę aukcji, którą gra aktualnie pokazuje. Powtórne odczyty tej samej listy nie
--- dublują ofert: klucz = przedmiot, cena, ilość, sprzedawca i numer wystąpienia identycznych ofert.
+function Scanner.isComplete(batch, total)
+  total = total or batch
+  return batch >= total or batch >= Scanner.FULL_SCAN_MIN
+end
+
+-- Odczytuje całą listę aukcji, którą gra aktualnie pokazuje. Zwraca false, gdy lista jest częściowa.
+-- Klucz oferty = przedmiot, cena, ilość, sprzedawca i numer wystąpienia identycznych ofert.
 function Scanner.collect()
-  local n = GetNumAuctionItems("list") or 0
+  local batch, total = GetNumAuctionItems("list")
+  batch = batch or 0
+  if batch == 0 then return false end
+  if not Scanner.isComplete(batch, total) then
+    Scanner.ignored = Scanner.ignored + 1
+    return false
+  end
   local seen = {}
-  for i = 1, n do
+  for i = 1, batch do
     local _, _, count, _, _, _, _, _, _, buyout, _, _, _, owner, _, _, itemId = GetAuctionItemInfo("list", i)
     if itemId and buyout and buyout > 0 and count and count > 0 then
       local base = itemId .. ":" .. buyout .. ":" .. count .. ":" .. (owner or "?")
@@ -25,11 +42,11 @@ function Scanner.collect()
       items[base .. "#" .. k] = { unit = buyout / count, qty = count }
     end
   end
+  return true
 end
 
 -- Zapisuje zebrane ceny do historii i czyści bufor. Zwraca liczbę zapisanych przedmiotów.
 function Scanner.flush()
-  pending = false
   local now = time()
   local saved = 0
   for itemId, offers in pairs(buffer) do
@@ -48,10 +65,15 @@ function Scanner.flush()
   return saved
 end
 
+-- Odczyt i zapis robimy raz, po ciszy (pełny skan wywołuje to zdarzenie wielokrotnie).
+function Scanner.process()
+  pending = false
+  if Scanner.collect() then Scanner.flush() end
+end
+
 function Scanner.onListUpdate()
-  Scanner.collect()
   if not pending then
     pending = true
-    C_Timer.After(Scanner.FLUSH_DELAY, Scanner.flush)
+    C_Timer.After(Scanner.FLUSH_DELAY, Scanner.process)
   end
 end

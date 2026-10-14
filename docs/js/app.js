@@ -1,10 +1,10 @@
-import { loadSavedVariables, makeContext, makeDisenchant, selectHouse } from "./datasource.js?v=e6237e29";
-import { kvSet, kvGet, kvDelete } from "./store.js?v=e6237e29";
-import { trend, formatMoney, formatPct, netProceeds } from "./engine.js?v=e6237e29";
+import { loadSavedVariables, makeContext, makeDisenchant, selectHouse } from "./datasource.js?v=94de9c7d";
+import { kvSet, kvGet, kvDelete } from "./store.js?v=94de9c7d";
+import { trend, formatMoney, formatPct, netProceeds } from "./engine.js?v=94de9c7d";
 import {
   professionIndex, vendorFlips, craftFlips, disenchantFlips, ahFlips, resolveWatchlist, guideInvestments,
   filterRows, sortRows, runCheck, onlyProfitable, filterReliable, filterBop, NO_PROFESSION,
-} from "./opportunities.js?v=e6237e29";
+} from "./opportunities.js?v=94de9c7d";
 
 const $ = (id) => document.getElementById(id);
 const MODE = document.body.dataset.mode || "tbc";
@@ -402,7 +402,7 @@ function renderStatus(extra) {
   if (n) {
     const k = state.model.known?.size ?? 0;
     add(k ? "ok" : "dim", k ? `Znane receptury: ${k} (filtr „tylko znane” działa).`
-      : "Znane receptury: brak. Zapisuje je addon DealHunterAH po otwarciu okna profesji (Auctionator ich nie zapisuje); filtr „tylko znane” jest wtedy pusty.");
+      : "Znane receptury: brak. Zapisuje je addon DealHunterAH po kliknięciu „Zapisz receptury” w oknie profesji (Auctionator ich nie zapisuje); filtr „tylko znane” jest wtedy pusty.");
   }
   if (state.saveFailed) add("err", "Nie udało się zapamiętać danych w przeglądarce - po odświeżeniu trzeba będzie wgrać plik ponownie.");
   const c = state.catalog;

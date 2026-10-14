@@ -11,14 +11,33 @@ end
 local frame = CreateFrame("Frame")
 frame:RegisterEvent("ADDON_LOADED")
 -- Zdarzenia opcjonalne rejestrujemy w pcall: jeśli któregoś klient nie zna, addon i tak się załaduje.
-for _, event in ipairs({ "AUCTION_ITEM_LIST_UPDATE", "TRADE_SKILL_SHOW", "TRADE_SKILL_UPDATE", "CRAFT_SHOW", "CRAFT_UPDATE" }) do
+for _, event in ipairs({ "AUCTION_ITEM_LIST_UPDATE", "TRADE_SKILL_SHOW", "CRAFT_SHOW" }) do
   pcall(frame.RegisterEvent, frame, event)
 end
 
-local function reportKnown(added, profession)
-  if added and added > 0 then
-    say(("zapisano %d nowych receptur (%s). Wpisz /reload, żeby plik się zapisał."):format(added, tostring(profession)))
+local function reportKnown(added, profession, total)
+  if not profession then
+    say("nie widzę otwartego okna profesji (otwórz profesję i spróbuj ponownie).")
+  elseif added > 0 then
+    say(("zapisano %d nowych receptur (%s, razem %d). Wpisz /reload, żeby plik się zapisał."):format(added, profession, total))
+  else
+    say(("brak nowych receptur (%s, zapisanych %d). Rozwiń wszystkie kategorie i wyłącz filtry, jeśli czegoś brakuje."):format(profession, total))
   end
+end
+
+-- Skan receptur uruchamia użytkownik: przycisk w oknie profesji albo /dhah recipes.
+local function scanRecipes(kind)
+  if kind == "craft" then return ns.Known.scanCraft() end
+  return ns.Known.scanTradeSkill()
+end
+
+local function addButton(parent, name, kind)
+  if not parent or _G[name] then return end
+  local button = CreateFrame("Button", name, parent, "UIPanelButtonTemplate")
+  button:SetSize(130, 22)
+  button:SetText("Zapisz receptury")
+  button:SetPoint("TOPRIGHT", parent, "TOPRIGHT", -70, -14)
+  button:SetScript("OnClick", function() reportKnown(scanRecipes(kind)) end)
 end
 
 frame:SetScript("OnEvent", function(_, event, arg1)
@@ -28,10 +47,10 @@ frame:SetScript("OnEvent", function(_, event, arg1)
     DealHunterAHDB.known = DealHunterAHDB.known or {}
   elseif event == "AUCTION_ITEM_LIST_UPDATE" then
     ns.Scanner.onListUpdate()
-  elseif event == "TRADE_SKILL_SHOW" or event == "TRADE_SKILL_UPDATE" then
-    reportKnown(ns.Known.scanTradeSkill())
-  elseif event == "CRAFT_SHOW" or event == "CRAFT_UPDATE" then
-    reportKnown(ns.Known.scanCraft())
+  elseif event == "TRADE_SKILL_SHOW" then
+    pcall(addButton, _G.TradeSkillFrame, "DealHunterAHRecipesButton", "tradeskill")
+  elseif event == "CRAFT_SHOW" then
+    pcall(addButton, _G.CraftFrame, "DealHunterAHCraftButton", "craft")
   end
 end)
 
@@ -43,9 +62,12 @@ local function cmdStatus()
     if h and h[#h] and h[#h].t > last then last = h[#h].t end
   end
   say(("przedmiotów z cenami: %d, ostatni skan: %s"):format(items, last > 0 and date("%Y-%m-%d %H:%M", last) or "brak"))
+  if ns.Scanner.ignored > 0 then
+    say(("pominięto %d częściowych list aukcji (zwykłe wyszukiwanie pokazuje tylko jedną stronę). Ceny zapisują się z pełnego skanu."):format(ns.Scanner.ignored))
+  end
   local total, per = ns.Known.count()
   if total == 0 then
-    say("znane receptury: brak. Otwórz okno każdej profesji (rozwiń kategorie i wyłącz filtry).")
+    say("znane receptury: brak. Otwórz okno profesji (rozwiń kategorie, wyłącz filtry) i kliknij \"Zapisz receptury\" albo wpisz /dhah recipes.")
   else
     local parts = {}
     for prof, n in pairs(per) do parts[#parts + 1] = ("%s %d"):format(prof, n) end
@@ -73,10 +95,17 @@ SlashCmdList["DEALHUNTERAH"] = function(msg)
   local cmd, arg = msg:match("^(%S*)%s*(.*)$")
   if cmd == "" or cmd == "status" then cmdStatus()
   elseif cmd == "item" then cmdItem(arg)
+  elseif cmd == "recipes" or cmd == "scan" then
+    -- zapisuje otwarte okno profesji (tradeskill i/lub craft)
+    local added, prof, total = ns.Known.scanTradeSkill()
+    if prof then reportKnown(added, prof, total) end
+    local cAdded, cProf, cTotal = ns.Known.scanCraft()
+    if cProf then reportKnown(cAdded, cProf, cTotal) end
+    if not prof and not cProf then reportKnown(0, nil, 0) end
   elseif cmd == "reset" and arg == "yes" then
     DealHunterAHDB.items = {}
     DealHunterAHDB.known = {}
     say("usunięto zapisane ceny i receptury.")
   elseif cmd == "reset" then say("to usunie wszystkie zapisane ceny i receptury. Potwierdź: /dhah reset yes")
-  else say("komendy: /dhah (status) | /dhah item <link> | /dhah reset yes") end
+  else say("komendy: /dhah (status) | /dhah recipes (zapisz otwarte okno profesji) | /dhah item <link> | /dhah reset yes") end
 end

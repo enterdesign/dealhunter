@@ -20,19 +20,27 @@ Prowizja i depozyt AH są domyślnie wyłączone.
 - **Addon DealHunterAH** (patrz niżej): zapisuje też medianę i średnią oraz znane receptury.
 
 ## Addon DealHunterAH
-Zbieracz danych (bez okna i bez automatyzacji): zapisuje ceny z **każdego** skanu AH, także zrobionego Auctionatorem
-(najniższa cena, mediana, średnia, ilość, historia), oraz **znane receptury** postaci.
+Zbieracz danych (bez własnego okna aukcji i bez automatyzacji): zapisuje ceny z **pełnego skanu AH zrobionego
+Auctionatorem** (najniższa cena, mediana, średnia, ilość, historia) oraz **znane receptury** postaci.
 Analizę robi strona. Addon niczego nie kupuje, nie wystawia i nie wysyła zapytań do AH.
 
+- **Ceny:** skanuje Auctionator (pełny skan, "Full Scan"). Addon zapisuje tylko kompletne listy aukcji; zwykłe wyszukiwanie
+  pokazuje jedną stronę wyników, więc jest pomijane (`/dhah` pokaże, ile list pominięto). Plik `Auctionator.lua` też
+  można wgrać na stronę, ale addon dodaje medianę i średnią.
+- **Receptury:** skan uruchamiasz sam. Otwórz okno profesji (rozwiń wszystkie kategorie, wyłącz filtry) i kliknij przycisk
+  "Zapisz receptury" w oknie profesji albo wpisz `/dhah recipes`. Dotyczy też Enchantingu (osobne okno).
+
+Instalacja i użycie:
 1. Pobierz `docs/DealHunterAH.zip` (link jest też na stronie) i rozpakuj do `World of Warcraft/<wersja>/Interface/AddOns/`
    (powstanie folder `DealHunterAH`). Numer `Interface` w `.toc` to 20506; jeśli addon nie widać na liście, sprawdź build
    komendą `/dump (select(4, GetBuildInfo()))` albo zaznacz "Load out of date AddOns".
-2. Zrób skan AH (np. Auctionatorem). W czacie pojawi się "zapisano ceny N przedmiotów".
-3. Otwórz okno każdej profesji (rozwiń wszystkie kategorie i wyłącz filtry), także Enchanting. Pojawi się "zapisano N nowych receptur".
+2. Zrób pełny skan AH Auctionatorem. W czacie pojawi się "zapisano ceny N przedmiotów".
+3. W oknie każdej profesji kliknij "Zapisz receptury". Pojawi się "zapisano N nowych receptur".
 4. Wpisz `/reload` (plik zapisuje się przy `/reload` albo wylogowaniu) i wgraj na stronie
    `WTF/Account/<konto>/SavedVariables/DealHunterAH.lua` (opcjonalnie razem z `Auctionator.lua`).
 
-Komendy: `/dhah` (status), `/dhah item <link>`, `/dhah reset yes`. Po zmianach w `addon/` uruchom `python3 tools/pack_addon.py`.
+Komendy: `/dhah` (status), `/dhah recipes`, `/dhah item <link>`, `/dhah reset yes`.
+Po zmianach w `addon/` uruchom `python3 tools/pack_addon.py`.
 
 ## Tryby gry
 Strona główna (`docs/index.html`) wybiera tryb. Dostępny: **TBC Anniversary** (`docs/tbc/`, dane w `docs/data/tbc/`).
