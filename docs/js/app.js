@@ -1,9 +1,10 @@
-import { loadSavedVariables, makeContext, makeDisenchant, selectHouse } from "./datasource.js?v=e383d2cd";
-import { trend, formatMoney, formatPct, netProceeds } from "./engine.js?v=e383d2cd";
+import { loadSavedVariables, makeContext, makeDisenchant, selectHouse } from "./datasource.js?v=44b95249";
+import { kvSet, kvGet, kvDelete } from "./store.js?v=44b95249";
+import { trend, formatMoney, formatPct, netProceeds } from "./engine.js?v=44b95249";
 import {
   professionIndex, vendorFlips, craftFlips, disenchantFlips, ahFlips, resolveWatchlist, guideInvestments,
   filterRows, sortRows, runCheck, onlyProfitable, filterReliable, NO_PROFESSION,
-} from "./opportunities.js?v=e383d2cd";
+} from "./opportunities.js?v=44b95249";
 
 const $ = (id) => document.getElementById(id);
 const MODE = document.body.dataset.mode || "tbc";
@@ -36,26 +37,22 @@ const settings = () => ({
   fee: { enabled: $("feeEnabled").checked, cut: (Number($("feeCut").value) || 0) / 100 },
 });
 
-// ---------- pamięć przeglądarki (opcjonalna) ----------
-function save() {
-  try {
-    localStorage.setItem(STORE_KEY, JSON.stringify({
-      items: Object.fromEntries(state.model.items), known: [...state.model.known], scannedAt: state.model.scannedAt,
-      source: state.model.source, noMedian: !!state.model.noMedian, house: state.model.house,
-    }));
-  } catch { /* brak miejsca lub zablokowane - strona działa dalej */ }
+// ---------- pamięć przeglądarki (IndexedDB) ----------
+// Zapisujemy cały model (Map/Set), także wszystkie serwery z pliku Auctionatora.
+async function save() {
+  const m = state.model;
+  const ok = await kvSet(STORE_KEY, {
+    items: m.items, houses: m.houses ?? null, house: m.house ?? null, known: m.known, scannedAt: m.scannedAt,
+    source: m.source ?? null, noMedian: !!m.noMedian,
+  });
+  state.saveFailed = !ok;
+  return ok;
 }
-function restore() {
-  try {
-    const raw = localStorage.getItem(STORE_KEY);
-    if (!raw) return;
-    const d = JSON.parse(raw);
-    state.model = {
-      source: d.source ?? "pamięć przeglądarki", noMedian: !!d.noMedian, house: d.house,
-      items: new Map(Object.entries(d.items).map(([k, v]) => [Number(k), v])),
-      known: new Set(d.known), scannedAt: d.scannedAt,
-    };
-  } catch { /* uszkodzone dane - ignoruj */ }
+async function restore() {
+  const d = await kvGet(STORE_KEY);
+  if (!d?.items?.size) return false;
+  state.model = { ...d, known: d.known ?? new Set(), restored: true };
+  return true;
 }
 
 async function loadJson(path, fallback) {
@@ -352,8 +349,10 @@ function renderStatus(extra) {
   if (n) {
     const when = state.model.scannedAt ? new Date(state.model.scannedAt * 1000).toLocaleString("pl-PL") : "?";
     add("ok", `Załadowano ${n} przedmiotów${state.model.house ? ` (${state.model.house})` : ""}, ostatni skan: ${when}.`);
+    if (state.model.testData) add("warn", "To są dane testowe z repozytorium, a nie Twój aktualny skan.");
     if (state.model.noMedian) add("dim", "Źródło: Auctionator zapisuje tylko najniższe ceny dzienne i ilość. Mediana i średnia są niedostępne, więc w ich miejsce używana jest najniższa cena.");
   } else add("dim", "Brak danych cenowych - wgraj plik.");
+  if (state.saveFailed) add("err", "Nie udało się zapamiętać danych w przeglądarce - po odświeżeniu trzeba będzie wgrać plik ponownie.");
   const c = state.catalog;
   add("dim", `Baza: ${state.recipes.length} receptur, ${Object.keys(c.items ?? {}).length} przedmiotów, ` +
     `${Object.keys(c.vendors ?? {}).length} cen u kupców, rozbiór: ${c.disenchant ? "tak" : "brak"}.`);
@@ -376,11 +375,24 @@ function switchTab(tab) {
 }
 
 // Plik czytamy jako bajty (bajt -> znak), bo Auctionator zapisuje w nim dane binarne, których UTF-8 by zepsuł.
-async function readBinaryText(file) {
-  const bytes = new Uint8Array(await file.arrayBuffer());
+function binaryString(buffer) {
+  const bytes = new Uint8Array(buffer);
   const parts = [];
   for (let i = 0; i < bytes.length; i += 16384) parts.push(String.fromCharCode(...bytes.subarray(i, i + 16384)));
   return parts.join("");
+}
+const readBinaryText = async (file) => binaryString(await file.arrayBuffer());
+
+// Skan testowy z repozytorium (okrojony Auctionator.lua) - używany, gdy użytkownik nie wgrał własnego pliku.
+async function loadTestScan() {
+  try {
+    const r = await fetch(DATA + "test-scan.lua", { cache: "no-cache" });
+    if (!r.ok) return false;
+    const res = loadSavedVariables(binaryString(await r.arrayBuffer()));
+    if (res.error) return false;
+    state.model = { ...res, testData: true };
+    return true;
+  } catch { return false; }
 }
 
 function renderHouses() {
@@ -394,17 +406,22 @@ function renderHouses() {
 
 async function handleFile(file) {
   if (!file) return;
-  const res = loadSavedVariables(await readBinaryText(file));
-  if (res.error) return refresh({ cls: "err", text: res.error });
-  state.model = res;
-  save();
-  renderHouses();
-  refresh({ cls: "ok", text: `Wczytano plik ${file.name}.` });
+  renderStatus({ cls: "dim", text: `Wczytuję plik ${file.name} (${(file.size / 1048576).toFixed(1)} MB)…` });
+  try {
+    const res = loadSavedVariables(await readBinaryText(file));
+    if (res.error) return refresh({ cls: "err", text: res.error });
+    state.model = res;
+    await save();
+    renderHouses();
+    refresh({ cls: "ok", text: `Wczytano plik ${file.name}.` });
+  } catch (e) {
+    refresh({ cls: "err", text: `Nie udało się wczytać pliku ${file.name}: ${e.message}` });
+  }
 }
 
 function wire() {
   const drop = $("drop");
-  $("file").addEventListener("change", (e) => handleFile(e.target.files[0]));
+  $("file").addEventListener("change", (e) => { handleFile(e.target.files[0]); e.target.value = ""; });
   for (const ev of ["dragenter", "dragover"]) drop.addEventListener(ev, (e) => { e.preventDefault(); drop.classList.add("over"); });
   for (const ev of ["dragleave", "drop"]) drop.addEventListener(ev, (e) => { e.preventDefault(); drop.classList.remove("over"); });
   drop.addEventListener("drop", (e) => handleFile(e.dataTransfer.files[0]));
@@ -421,15 +438,18 @@ function wire() {
   $("maxRoi").addEventListener("change", renderDeals);
   $("itemFilter").addEventListener("input", (e) => { state.itemFilter = e.target.value; renderItems(); });
   $("clear").addEventListener("click", () => {
-    try { localStorage.removeItem(STORE_KEY); } catch { /* ignoruj */ }
+    kvDelete(STORE_KEY);
     state.model = { items: new Map(), known: new Set(), scannedAt: 0 };
+    renderHouses();
     refresh({ cls: "dim", text: "Usunięto zapamiętane dane." });
   });
 }
 
 async function init() {
   wire();
-  restore();
+  const restored = await restore();
+  const testScan = restored ? false : await loadTestScan();
+  renderHouses();
   const [recipes, items, vendors, de, strategies] = await Promise.all([
     loadJson("recipes.json", []), loadJson("items.json", { items: {} }), loadJson("vendors.json", { prices: {} }),
     loadJson("disenchant.json", null), loadJson("strategies.json", { strategies: [] }),
@@ -439,6 +459,8 @@ async function init() {
   state.strategies = strategies.strategies ?? [];
   state.profIdx = professionIndex(recipes);
   renderProfessionSelects();
-  refresh();
+  refresh(restored ? { cls: "dim", text: "Przywrócono dane zapisane w tej przeglądarce podczas poprzedniej wizyty." }
+    : testScan ? { cls: "dim", text: "Wczytano skan testowy z repozytorium (okrojony Auctionator.lua). Wgraj własny plik, żeby go zastąpić." }
+    : undefined);
 }
 init();
